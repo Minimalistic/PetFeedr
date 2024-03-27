@@ -1,14 +1,16 @@
-import schedule
 import time
+import schedule
 import logging
+import subprocess
+from servo_control import control_servo
 
 # Configure logging
 logging.basicConfig(filename='feeding_log.txt', level=logging.INFO,
                     format='%(asctime)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
 def feed_pet():
-    # TODO: Replace this with actual servo control
-    logging.info("Feeding the pet")
+    control_servo()
+    logging.info("Feeding the pet! 🐱")
 
 def setup_schedule():
     # Currently no pre-populated schedules, keeping around as I believe it's used by the web interface
@@ -29,8 +31,6 @@ def run():
 
     while True:
         schedule.run_pending()
-
-import subprocess
 
 def run_web_interface():
     subprocess.Popen(["python3", "web_interface.py"])

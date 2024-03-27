@@ -5,30 +5,33 @@
             <meta name="viewport" content="width=device-width, initial-scale=1">
             <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles.css') }}">
         </head>
-<body>
-    <h1>PetFeedr</h1>
+    <body>
+        <h1>PetFeedr</h1>
 
-    <h2>Scheduled Feeding Times:</h2>
-    <ul>
-        {% for job in scheduled_jobs %}
-        <li>
-            {{ job }}
-            <form action="/delete" method="post" style="display: inline;">
-                <input type="hidden" name="job_time" value="{{ job }}">
-                <input type="submit" value="Delete">
-            </form>
-        </li>
-        {% endfor %}
-    </ul>
+        <h2>Scheduled Feeding Times:</h2>
+        <ul>
+            {% for job in scheduled_jobs %}
+            <li>
+                {{ job }}
+                <form action="/delete" method="post" style="display: inline;">
+                    <input type="hidden" name="job_time" value="{{ job }}">
+                    <input type="submit" value="Delete">
+                </form>
+            </li>
+            {% endfor %}
+        </ul>
 
-    <h2>Add New Feeding Time:</h2>
-    <form action="/add" method="post">
-        <input type="number" name="hour" min="0" max="23" placeholder="Hour" required>
-        <input type="number" name="minute" min="0" max="59" placeholder="Minute" required>
-        <input type="submit" value="Add">
-    </form>
-
-    <h2>Log Messages:</h2>
-    <pre>{{ log_messages }}</pre>
-</body>
+        <h2>Add New Feeding Time:</h2>
+        <form action="/add" method="post">
+            <input type="number" name="hour" min="0" max="23" placeholder="Hour" required>
+            <input type="number" name="minute" min="0" max="59" placeholder="Minute" required>
+            <input type="submit" value="Add">
+        </form>
+        <h6>Manual control</h6>
+        <form action="/feed" method="post">
+            <input type="submit" value="Trigger a one time feeding">
+        </form>
+        <h2>Log Messages:</h2>
+        <pre>{{ log_messages }}</pre>
+    </body>
 </html>

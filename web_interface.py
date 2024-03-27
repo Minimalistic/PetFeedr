@@ -75,6 +75,12 @@ def delete_job():
         logging.error(f"Error deleting feeding time: {str(e)}")
         return "An error occurred while deleting the feeding time.", 500
 
+@app.route('/feed', methods=['POST'])
+def feed_now():
+    feed_pet()
+    logging.info("Manually fed the pet")
+    return redirect('/')
+
 def feed_pet():
     # TODO: Replace this with actual servo control
     logging.info("Feeding the pet")
