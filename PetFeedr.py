@@ -33,7 +33,7 @@ def run():
 import subprocess
 
 def run_web_interface():
-    subprocess.Popen(["python", "/home/jasonadmin/web_interface.py"])
+    subprocess.Popen(["python3", "web_interface.py"])
 
 if __name__ == "__main__":
     run_web_interface() # Start web server
