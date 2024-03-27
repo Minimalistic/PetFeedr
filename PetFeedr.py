@@ -11,9 +11,8 @@ def feed_pet():
     logging.info("Feeding the pet")
 
 def setup_schedule():
-    # Configure feeding schedule
-    schedule.every().day.at("08:00").do(feed_pet)
-    schedule.every().day.at("18:00").do(feed_pet)
+    # Currently no pre-populated schedules, keeping around as I believe it's used by the web interface
+    pass
 
 def run():
     # Load feeding times from file
