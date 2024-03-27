@@ -1,371 +1,53 @@
-2024-03-26 21:01:38 - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+2024-03-27 16:17:56 - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
  * Running on all addresses (0.0.0.0)
  * Running on http://127.0.0.1:5000
  * Running on http://192.168.1.192:5000
-2024-03-26 21:01:38 - [33mPress CTRL+C to quit[0m
-2024-03-26 21:01:38 -  * Restarting with stat
-2024-03-26 21:01:38 -  * Debugger is active!
-2024-03-26 21:01:38 -  * Debugger PIN: 123-908-400
-2024-03-26 21:01:51 - 192.168.1.192 - - [26/Mar/2024 21:01:51] "GET / HTTP/1.1" 200 -
-2024-03-26 21:01:51 - 192.168.1.192 - - [26/Mar/2024 21:01:51] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
-2024-03-26 21:01:59 - Added feeding time: 02:03
-2024-03-26 21:01:59 - 192.168.1.192 - - [26/Mar/2024 21:01:59] "[32mPOST /add HTTP/1.1[0m" 302 -
-2024-03-26 21:01:59 - 192.168.1.192 - - [26/Mar/2024 21:01:59] "GET / HTTP/1.1" 200 -
-2024-03-26 21:02:00 - Deleted feeding time: 02:03
-2024-03-26 21:02:00 - 192.168.1.192 - - [26/Mar/2024 21:02:00] "[32mPOST /delete HTTP/1.1[0m" 302 -
-2024-03-26 21:02:00 - 192.168.1.192 - - [26/Mar/2024 21:02:00] "GET / HTTP/1.1" 200 -
-2024-03-26 21:02:03 - Added feeding time: 22:02
-2024-03-26 21:02:03 - 192.168.1.192 - - [26/Mar/2024 21:02:03] "[32mPOST /add HTTP/1.1[0m" 302 -
-2024-03-26 21:02:03 - 192.168.1.192 - - [26/Mar/2024 21:02:03] "GET / HTTP/1.1" 200 -
-2024-03-26 21:02:24 - Added feeding time: 17:03
-2024-03-26 21:02:24 - 192.168.1.192 - - [26/Mar/2024 21:02:24] "[32mPOST /add HTTP/1.1[0m" 302 -
-2024-03-26 21:02:24 - 192.168.1.192 - - [26/Mar/2024 21:02:24] "GET / HTTP/1.1" 200 -
-2024-03-26 21:02:35 - 192.168.1.192 - - [26/Mar/2024 21:02:35] "GET / HTTP/1.1" 200 -
-2024-03-26 21:02:44 - 192.168.1.192 - - [26/Mar/2024 21:02:44] "GET / HTTP/1.1" 200 -
-2024-03-26 21:02:50 - 192.168.1.192 - - [26/Mar/2024 21:02:50] "GET / HTTP/1.1" 200 -
-2024-03-26 21:02:58 - 192.168.1.192 - - [26/Mar/2024 21:02:58] "GET / HTTP/1.1" 200 -
-2024-03-26 21:03:01 - 192.168.1.192 - - [26/Mar/2024 21:03:01] "GET / HTTP/1.1" 200 -
-2024-03-26 21:03:02 - 192.168.1.192 - - [26/Mar/2024 21:03:02] "GET / HTTP/1.1" 200 -
-2024-03-26 21:03:04 - 192.168.1.192 - - [26/Mar/2024 21:03:04] "GET / HTTP/1.1" 200 -
-2024-03-26 21:03:04 - 192.168.1.192 - - [26/Mar/2024 21:03:04] "GET / HTTP/1.1" 200 -
-2024-03-26 21:03:05 - 192.168.1.192 - - [26/Mar/2024 21:03:05] "GET / HTTP/1.1" 200 -
-2024-03-26 21:03:42 - Added feeding time: 21:04
-2024-03-26 21:03:42 - 192.168.1.192 - - [26/Mar/2024 21:03:42] "[32mPOST /add HTTP/1.1[0m" 302 -
-2024-03-26 21:03:42 - 192.168.1.192 - - [26/Mar/2024 21:03:42] "GET / HTTP/1.1" 200 -
-2024-03-26 21:03:45 - Deleted feeding time: 17:03
-2024-03-26 21:03:45 - 192.168.1.192 - - [26/Mar/2024 21:03:45] "[32mPOST /delete HTTP/1.1[0m" 302 -
-2024-03-26 21:03:45 - 192.168.1.192 - - [26/Mar/2024 21:03:45] "GET / HTTP/1.1" 200 -
-2024-03-26 21:03:53 - 192.168.1.192 - - [26/Mar/2024 21:03:53] "GET / HTTP/1.1" 200 -
-2024-03-26 21:03:53 - 192.168.1.192 - - [26/Mar/2024 21:03:53] "GET / HTTP/1.1" 200 -
-2024-03-26 21:03:54 - 192.168.1.192 - - [26/Mar/2024 21:03:54] "GET / HTTP/1.1" 200 -
-2024-03-26 21:04:00 - Feeding the pet
-2024-03-26 21:04:02 - 192.168.1.192 - - [26/Mar/2024 21:04:02] "GET / HTTP/1.1" 200 -
-2024-03-26 21:06:37 - Loaded feeding time: 10:02 PM
-2024-03-26 21:06:37 - Loaded feeding time: 09:04 PM
-2024-03-26 21:06:37 - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+2024-03-27 16:17:56 - [33mPress CTRL+C to quit[0m
+2024-03-27 16:17:56 -  * Restarting with stat
+2024-03-27 16:17:56 -  * Debugger is active!
+2024-03-27 16:17:56 -  * Debugger PIN: 375-076-903
+2024-03-27 16:19:49 - Error reading feeding_schedules.txt: name 'feed_pet' is not defined
+2024-03-27 16:19:54 - Error reading feeding_schedules.txt: name 'feed_pet' is not defined
+2024-03-27 16:20:13 - Error reading feeding_schedules.txt: name 'feed_pet' is not defined
+2024-03-27 16:20:35 - Loaded feeding time: 16:05
+2024-03-27 16:21:00 - Loaded feeding time: 16:05
+2024-03-27 16:21:15 - Loaded feeding time: 16:05
+2024-03-27 16:27:43 - Loaded feeding time: 16:05
+2024-03-27 16:27:43 - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
  * Running on all addresses (0.0.0.0)
  * Running on http://127.0.0.1:5000
  * Running on http://192.168.1.192:5000
-2024-03-26 21:06:37 - [33mPress CTRL+C to quit[0m
-2024-03-26 21:06:37 -  * Restarting with stat
-2024-03-26 21:06:37 -  * Debugger is active!
-2024-03-26 21:06:37 -  * Debugger PIN: 123-908-400
-2024-03-26 21:06:40 - 192.168.1.192 - - [26/Mar/2024 21:06:40] "GET / HTTP/1.1" 200 -
-2024-03-26 21:06:48 - Added feeding time: 02:02
-2024-03-26 21:06:48 - 192.168.1.192 - - [26/Mar/2024 21:06:48] "[32mPOST /add HTTP/1.1[0m" 302 -
-2024-03-26 21:06:48 - 192.168.1.192 - - [26/Mar/2024 21:06:48] "GET / HTTP/1.1" 200 -
-2024-03-26 21:07:07 -  * Detected change in '/home/jasonadmin/GithubRepos/PetFeedr/PetFeedr.py', reloading
-2024-03-26 21:10:41 - Loaded feeding time: 22:02
-2024-03-26 21:10:41 - Loaded feeding time: 21:04
-2024-03-26 21:10:41 - Loaded feeding time: 02:02
-2024-03-26 21:10:41 - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+2024-03-27 16:27:43 - [33mPress CTRL+C to quit[0m
+2024-03-27 16:27:43 -  * Restarting with stat
+2024-03-27 16:27:43 -  * Debugger is active!
+2024-03-27 16:27:43 -  * Debugger PIN: 375-076-903
+2024-03-27 16:28:03 - 192.168.1.192 - - [27/Mar/2024 16:28:03] "GET / HTTP/1.1" 200 -
+2024-03-27 16:28:03 - 192.168.1.192 - - [27/Mar/2024 16:28:03] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
+2024-03-27 16:28:11 - Feeding the pet
+2024-03-27 16:28:11 - Manually fed the pet
+2024-03-27 16:28:11 - 192.168.1.192 - - [27/Mar/2024 16:28:11] "[32mPOST /feed HTTP/1.1[0m" 302 -
+2024-03-27 16:28:11 - 192.168.1.192 - - [27/Mar/2024 16:28:11] "GET / HTTP/1.1" 200 -
+2024-03-27 16:28:11 - 192.168.1.192 - - [27/Mar/2024 16:28:11] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
+2024-03-27 16:32:13 - Loaded feeding time: 16:05
+2024-03-27 16:32:14 - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
  * Running on all addresses (0.0.0.0)
  * Running on http://127.0.0.1:5000
  * Running on http://192.168.1.192:5000
-2024-03-26 21:10:41 - [33mPress CTRL+C to quit[0m
-2024-03-26 21:10:41 -  * Restarting with stat
-2024-03-26 21:10:41 -  * Debugger is active!
-2024-03-26 21:10:41 -  * Debugger PIN: 123-908-400
-2024-03-26 21:10:47 - 192.168.1.192 - - [26/Mar/2024 21:10:47] "GET / HTTP/1.1" 200 -
-2024-03-26 21:10:47 - 192.168.1.192 - - [26/Mar/2024 21:10:47] "[33mGET /styles.css HTTP/1.1[0m" 404 -
-2024-03-26 21:11:11 - Loaded feeding time: 22:02
-2024-03-26 21:11:11 - Loaded feeding time: 21:04
-2024-03-26 21:11:11 - Loaded feeding time: 02:02
-2024-03-26 21:11:12 - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+2024-03-27 16:32:14 - [33mPress CTRL+C to quit[0m
+2024-03-27 16:32:14 -  * Restarting with stat
+2024-03-27 16:32:14 -  * Debugger is active!
+2024-03-27 16:32:14 -  * Debugger PIN: 375-076-903
+2024-03-27 16:32:15 - 192.168.1.192 - - [27/Mar/2024 16:32:15] "GET / HTTP/1.1" 200 -
+2024-03-27 16:32:16 - 192.168.1.192 - - [27/Mar/2024 16:32:16] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
+2024-03-27 16:33:30 - Loaded feeding time: 16:05
+2024-03-27 16:33:49 - Loaded feeding time: 16:05
+2024-03-27 16:35:15 - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
  * Running on all addresses (0.0.0.0)
  * Running on http://127.0.0.1:5000
  * Running on http://192.168.1.192:5000
-2024-03-26 21:11:12 - [33mPress CTRL+C to quit[0m
-2024-03-26 21:11:12 -  * Restarting with stat
-2024-03-26 21:11:12 -  * Debugger is active!
-2024-03-26 21:11:12 -  * Debugger PIN: 123-908-400
-2024-03-26 21:11:27 - 192.168.1.172 - - [26/Mar/2024 21:11:27] "GET / HTTP/1.1" 200 -
-2024-03-26 21:11:27 - 192.168.1.172 - - [26/Mar/2024 21:11:27] "[33mGET /styles.css HTTP/1.1[0m" 404 -
-2024-03-26 21:11:28 - 192.168.1.172 - - [26/Mar/2024 21:11:28] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
-2024-03-26 21:13:03 - Loaded feeding time: 22:02
-2024-03-26 21:13:03 - Loaded feeding time: 21:04
-2024-03-26 21:13:03 - Loaded feeding time: 02:02
-2024-03-26 21:13:03 - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
- * Running on all addresses (0.0.0.0)
- * Running on http://127.0.0.1:5000
- * Running on http://192.168.1.192:5000
-2024-03-26 21:13:03 - [33mPress CTRL+C to quit[0m
-2024-03-26 21:13:03 -  * Restarting with stat
-2024-03-26 21:13:03 -  * Debugger is active!
-2024-03-26 21:13:03 -  * Debugger PIN: 123-908-400
-2024-03-26 21:13:05 - 192.168.1.192 - - [26/Mar/2024 21:13:05] "GET / HTTP/1.1" 200 -
-2024-03-26 21:13:05 - 192.168.1.192 - - [26/Mar/2024 21:13:05] "[33mGET /styles.css HTTP/1.1[0m" 404 -
-2024-03-26 21:13:06 - 192.168.1.192 - - [26/Mar/2024 21:13:06] "GET / HTTP/1.1" 200 -
-2024-03-26 21:13:07 - 192.168.1.192 - - [26/Mar/2024 21:13:07] "[33mGET /styles.css HTTP/1.1[0m" 404 -
-2024-03-26 21:13:18 - 192.168.1.192 - - [26/Mar/2024 21:13:18] "GET / HTTP/1.1" 200 -
-2024-03-26 21:13:18 - 192.168.1.192 - - [26/Mar/2024 21:13:18] "[33mGET /styles.css HTTP/1.1[0m" 404 -
-2024-03-26 21:14:10 - 192.168.1.192 - - [26/Mar/2024 21:14:10] "GET / HTTP/1.1" 200 -
-2024-03-26 21:14:10 - 192.168.1.192 - - [26/Mar/2024 21:14:10] "[33mGET /~/templates/styles.css HTTP/1.1[0m" 404 -
-2024-03-26 21:14:11 - 192.168.1.192 - - [26/Mar/2024 21:14:11] "GET / HTTP/1.1" 200 -
-2024-03-26 21:14:11 - 192.168.1.192 - - [26/Mar/2024 21:14:11] "[33mGET /~/templates/styles.css HTTP/1.1[0m" 404 -
-2024-03-26 21:14:20 - 192.168.1.192 - - [26/Mar/2024 21:14:20] "GET / HTTP/1.1" 200 -
-2024-03-26 21:14:20 - 192.168.1.192 - - [26/Mar/2024 21:14:20] "[33mGET /~/templates/styles.css HTTP/1.1[0m" 404 -
-2024-03-26 21:14:45 -  * Detected change in '/home/jasonadmin/GithubRepos/PetFeedr/PetFeedr.py', reloading
-2024-03-26 21:15:04 - Loaded feeding time: 22:02
-2024-03-26 21:15:04 - Loaded feeding time: 21:04
-2024-03-26 21:15:04 - Loaded feeding time: 02:02
-2024-03-26 21:15:04 - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
- * Running on all addresses (0.0.0.0)
- * Running on http://127.0.0.1:5000
- * Running on http://192.168.1.192:5000
-2024-03-26 21:15:04 - [33mPress CTRL+C to quit[0m
-2024-03-26 21:15:04 -  * Restarting with stat
-2024-03-26 21:15:05 -  * Debugger is active!
-2024-03-26 21:15:05 -  * Debugger PIN: 123-908-400
-2024-03-26 21:15:06 - 192.168.1.192 - - [26/Mar/2024 21:15:06] "GET / HTTP/1.1" 200 -
-2024-03-26 21:15:06 - 192.168.1.192 - - [26/Mar/2024 21:15:06] "[33mGET /templates/styles.css HTTP/1.1[0m" 404 -
-2024-03-26 21:16:18 - Loaded feeding time: 22:02
-2024-03-26 21:16:18 - Loaded feeding time: 21:04
-2024-03-26 21:16:18 - Loaded feeding time: 02:02
-2024-03-26 21:16:18 - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
- * Running on all addresses (0.0.0.0)
- * Running on http://127.0.0.1:5000
- * Running on http://192.168.1.192:5000
-2024-03-26 21:16:18 - [33mPress CTRL+C to quit[0m
-2024-03-26 21:16:18 -  * Restarting with stat
-2024-03-26 21:16:18 -  * Debugger is active!
-2024-03-26 21:16:18 -  * Debugger PIN: 123-908-400
-2024-03-26 21:16:20 - 192.168.1.192 - - [26/Mar/2024 21:16:20] "GET / HTTP/1.1" 200 -
-2024-03-26 21:16:20 - 192.168.1.192 - - [26/Mar/2024 21:16:20] "[33mGET /styles.css HTTP/1.1[0m" 404 -
-2024-03-26 21:16:21 - 192.168.1.192 - - [26/Mar/2024 21:16:21] "GET / HTTP/1.1" 200 -
-2024-03-26 21:16:21 - 192.168.1.192 - - [26/Mar/2024 21:16:21] "[33mGET /styles.css HTTP/1.1[0m" 404 -
-2024-03-26 21:18:44 - Loaded feeding time: 22:02
-2024-03-26 21:18:44 - Loaded feeding time: 21:04
-2024-03-26 21:18:44 - Loaded feeding time: 02:02
-2024-03-26 21:18:44 - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
- * Running on all addresses (0.0.0.0)
- * Running on http://127.0.0.1:5000
- * Running on http://192.168.1.192:5000
-2024-03-26 21:18:44 - [33mPress CTRL+C to quit[0m
-2024-03-26 21:18:45 -  * Restarting with stat
-2024-03-26 21:18:45 -  * Debugger is active!
-2024-03-26 21:18:45 -  * Debugger PIN: 123-908-400
-2024-03-26 21:18:46 - 192.168.1.192 - - [26/Mar/2024 21:18:46] "GET / HTTP/1.1" 200 -
-2024-03-26 21:18:46 - 192.168.1.192 - - [26/Mar/2024 21:18:46] "GET /static/styles.css HTTP/1.1" 200 -
-2024-03-26 21:19:02 - 192.168.1.192 - - [26/Mar/2024 21:19:02] "GET / HTTP/1.1" 200 -
-2024-03-26 21:19:02 - 192.168.1.192 - - [26/Mar/2024 21:19:02] "GET /static/styles.css HTTP/1.1" 200 -
-2024-03-26 21:20:40 - Loaded feeding time: 22:02
-2024-03-26 21:20:40 - Loaded feeding time: 21:04
-2024-03-26 21:20:40 - Loaded feeding time: 02:02
-2024-03-26 21:20:40 - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
- * Running on all addresses (0.0.0.0)
- * Running on http://127.0.0.1:5000
- * Running on http://192.168.1.192:5000
-2024-03-26 21:20:40 - [33mPress CTRL+C to quit[0m
-2024-03-26 21:20:40 -  * Restarting with stat
-2024-03-26 21:20:40 -  * Debugger is active!
-2024-03-26 21:20:40 -  * Debugger PIN: 375-076-903
-2024-03-26 21:20:42 - 192.168.1.192 - - [26/Mar/2024 21:20:42] "GET / HTTP/1.1" 200 -
-2024-03-26 21:20:42 - 192.168.1.192 - - [26/Mar/2024 21:20:42] "GET /static/styles.css HTTP/1.1" 200 -
-2024-03-26 21:20:42 - 192.168.1.192 - - [26/Mar/2024 21:20:42] "GET / HTTP/1.1" 200 -
-2024-03-26 21:20:42 - 192.168.1.192 - - [26/Mar/2024 21:20:42] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
-2024-03-26 21:21:45 - Loaded feeding time: 22:02
-2024-03-26 21:21:45 - Loaded feeding time: 21:04
-2024-03-26 21:21:45 - Loaded feeding time: 02:02
-2024-03-26 21:21:45 - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
- * Running on all addresses (0.0.0.0)
- * Running on http://127.0.0.1:5000
- * Running on http://192.168.1.192:5000
-2024-03-26 21:21:45 - [33mPress CTRL+C to quit[0m
-2024-03-26 21:21:45 -  * Restarting with stat
-2024-03-26 21:21:46 -  * Debugger is active!
-2024-03-26 21:21:46 -  * Debugger PIN: 375-076-903
-2024-03-26 21:21:46 - 192.168.1.192 - - [26/Mar/2024 21:21:46] "GET / HTTP/1.1" 200 -
-2024-03-26 21:21:46 - 192.168.1.192 - - [26/Mar/2024 21:21:46] "GET /static/styles.css HTTP/1.1" 200 -
-2024-03-26 21:22:36 - 192.168.1.192 - - [26/Mar/2024 21:22:36] "GET / HTTP/1.1" 200 -
-2024-03-26 21:22:36 - 192.168.1.192 - - [26/Mar/2024 21:22:36] "GET /static/styles.css HTTP/1.1" 200 -
-2024-03-26 21:22:47 - 192.168.1.172 - - [26/Mar/2024 21:22:47] "GET / HTTP/1.1" 200 -
-2024-03-26 21:22:47 - 192.168.1.172 - - [26/Mar/2024 21:22:47] "GET /static/styles.css HTTP/1.1" 200 -
-2024-03-26 21:24:21 - 192.168.1.192 - - [26/Mar/2024 21:24:21] "GET / HTTP/1.1" 200 -
-2024-03-26 21:24:21 - 192.168.1.192 - - [26/Mar/2024 21:24:21] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
-2024-03-26 21:24:35 - 192.168.1.192 - - [26/Mar/2024 21:24:35] "GET / HTTP/1.1" 200 -
-2024-03-26 21:24:36 - 192.168.1.192 - - [26/Mar/2024 21:24:36] "GET /static/styles.css HTTP/1.1" 200 -
-2024-03-26 21:24:52 - 192.168.1.172 - - [26/Mar/2024 21:24:52] "GET / HTTP/1.1" 200 -
-2024-03-26 21:24:52 - 192.168.1.172 - - [26/Mar/2024 21:24:52] "GET /static/styles.css HTTP/1.1" 200 -
-2024-03-26 21:24:56 - Deleted feeding time: 22:02
-2024-03-26 21:24:56 - 192.168.1.172 - - [26/Mar/2024 21:24:56] "[32mPOST /delete HTTP/1.1[0m" 302 -
-2024-03-26 21:24:56 - 192.168.1.172 - - [26/Mar/2024 21:24:56] "GET / HTTP/1.1" 200 -
-2024-03-26 21:24:56 - 192.168.1.172 - - [26/Mar/2024 21:24:56] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
-2024-03-26 21:25:00 - 192.168.1.172 - - [26/Mar/2024 21:25:00] "GET / HTTP/1.1" 200 -
-2024-03-26 21:25:00 - 192.168.1.172 - - [26/Mar/2024 21:25:00] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
-2024-03-26 21:25:02 - 192.168.1.172 - - [26/Mar/2024 21:25:02] "GET / HTTP/1.1" 200 -
-2024-03-26 21:25:02 - 192.168.1.172 - - [26/Mar/2024 21:25:02] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
-2024-03-26 21:26:00 - 192.168.1.192 - - [26/Mar/2024 21:26:00] "GET / HTTP/1.1" 200 -
-2024-03-26 21:26:00 - 192.168.1.192 - - [26/Mar/2024 21:26:00] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
-2024-03-26 21:26:44 - 192.168.1.192 - - [26/Mar/2024 21:26:44] "GET / HTTP/1.1" 200 -
-2024-03-26 21:26:44 - 192.168.1.192 - - [26/Mar/2024 21:26:44] "GET /static/styles.css HTTP/1.1" 200 -
-2024-03-26 21:27:10 - 192.168.1.192 - - [26/Mar/2024 21:27:10] "GET / HTTP/1.1" 200 -
-2024-03-26 21:27:10 - 192.168.1.192 - - [26/Mar/2024 21:27:10] "GET /static/styles.css HTTP/1.1" 200 -
-2024-03-26 21:27:12 - 192.168.1.192 - - [26/Mar/2024 21:27:12] "GET / HTTP/1.1" 200 -
-2024-03-26 21:27:12 - 192.168.1.192 - - [26/Mar/2024 21:27:12] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
-2024-03-26 21:28:20 - 192.168.1.192 - - [26/Mar/2024 21:28:20] "GET / HTTP/1.1" 200 -
-2024-03-26 21:28:21 - 192.168.1.192 - - [26/Mar/2024 21:28:21] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
-2024-03-26 21:28:41 - 192.168.1.192 - - [26/Mar/2024 21:28:41] "GET / HTTP/1.1" 200 -
-2024-03-26 21:28:41 - 192.168.1.192 - - [26/Mar/2024 21:28:41] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
-2024-03-26 21:29:30 - 192.168.1.192 - - [26/Mar/2024 21:29:30] "GET / HTTP/1.1" 200 -
-2024-03-26 21:29:30 - 192.168.1.192 - - [26/Mar/2024 21:29:30] "GET /static/styles.css HTTP/1.1" 200 -
-2024-03-26 21:29:31 - 192.168.1.192 - - [26/Mar/2024 21:29:31] "GET / HTTP/1.1" 200 -
-2024-03-26 21:29:31 - 192.168.1.192 - - [26/Mar/2024 21:29:31] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
-2024-03-26 21:29:32 - 192.168.1.192 - - [26/Mar/2024 21:29:32] "GET / HTTP/1.1" 200 -
-2024-03-26 21:29:32 - 192.168.1.192 - - [26/Mar/2024 21:29:32] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
-2024-03-26 21:29:46 - 192.168.1.192 - - [26/Mar/2024 21:29:46] "GET / HTTP/1.1" 200 -
-2024-03-26 21:29:47 - 192.168.1.192 - - [26/Mar/2024 21:29:47] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
-2024-03-26 21:30:17 - 192.168.1.192 - - [26/Mar/2024 21:30:17] "GET / HTTP/1.1" 200 -
-2024-03-26 21:30:17 - 192.168.1.192 - - [26/Mar/2024 21:30:17] "GET /static/styles.css HTTP/1.1" 200 -
-2024-03-26 21:30:27 - 192.168.1.192 - - [26/Mar/2024 21:30:27] "GET / HTTP/1.1" 200 -
-2024-03-26 21:30:27 - 192.168.1.192 - - [26/Mar/2024 21:30:27] "GET /static/styles.css HTTP/1.1" 200 -
-2024-03-26 21:31:01 - 192.168.1.192 - - [26/Mar/2024 21:31:01] "GET / HTTP/1.1" 200 -
-2024-03-26 21:31:01 - 192.168.1.192 - - [26/Mar/2024 21:31:01] "GET /static/styles.css HTTP/1.1" 200 -
-2024-03-26 21:31:15 - 192.168.1.172 - - [26/Mar/2024 21:31:15] "GET / HTTP/1.1" 200 -
-2024-03-26 21:31:16 - 192.168.1.172 - - [26/Mar/2024 21:31:16] "GET /static/styles.css HTTP/1.1" 200 -
-2024-03-26 21:31:42 - 192.168.1.192 - - [26/Mar/2024 21:31:42] "GET / HTTP/1.1" 200 -
-2024-03-26 21:31:42 - 192.168.1.192 - - [26/Mar/2024 21:31:42] "GET /static/styles.css HTTP/1.1" 200 -
-2024-03-26 21:31:42 - 192.168.1.192 - - [26/Mar/2024 21:31:42] "GET / HTTP/1.1" 200 -
-2024-03-26 21:31:43 - 192.168.1.192 - - [26/Mar/2024 21:31:43] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
-2024-03-26 21:31:51 - 192.168.1.172 - - [26/Mar/2024 21:31:51] "GET / HTTP/1.1" 200 -
-2024-03-26 21:31:52 - 192.168.1.172 - - [26/Mar/2024 21:31:52] "GET /static/styles.css HTTP/1.1" 200 -
-2024-03-26 21:32:03 - 192.168.1.192 - - [26/Mar/2024 21:32:03] "GET / HTTP/1.1" 200 -
-2024-03-26 21:32:03 - 192.168.1.192 - - [26/Mar/2024 21:32:03] "GET /static/styles.css HTTP/1.1" 200 -
-2024-03-26 21:32:04 - 192.168.1.192 - - [26/Mar/2024 21:32:04] "GET / HTTP/1.1" 200 -
-2024-03-26 21:32:04 - 192.168.1.192 - - [26/Mar/2024 21:32:04] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
-2024-03-26 21:32:04 - 192.168.1.192 - - [26/Mar/2024 21:32:04] "GET / HTTP/1.1" 200 -
-2024-03-26 21:32:04 - 192.168.1.192 - - [26/Mar/2024 21:32:04] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
-2024-03-26 21:32:57 - 192.168.1.192 - - [26/Mar/2024 21:32:57] "GET / HTTP/1.1" 200 -
-2024-03-26 21:32:57 - 192.168.1.192 - - [26/Mar/2024 21:32:57] "GET /static/styles.css HTTP/1.1" 200 -
-2024-03-26 21:33:02 - Deleted feeding time: 21:04
-2024-03-26 21:33:02 - 192.168.1.192 - - [26/Mar/2024 21:33:02] "[32mPOST /delete HTTP/1.1[0m" 302 -
-2024-03-26 21:33:02 - 192.168.1.192 - - [26/Mar/2024 21:33:02] "GET / HTTP/1.1" 200 -
-2024-03-26 21:33:02 - 192.168.1.192 - - [26/Mar/2024 21:33:02] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
-2024-03-26 21:33:05 - Added feeding time: 22:03
-2024-03-26 21:33:05 - 192.168.1.192 - - [26/Mar/2024 21:33:05] "[32mPOST /add HTTP/1.1[0m" 302 -
-2024-03-26 21:33:05 - 192.168.1.192 - - [26/Mar/2024 21:33:05] "GET / HTTP/1.1" 200 -
-2024-03-26 21:33:05 - 192.168.1.192 - - [26/Mar/2024 21:33:05] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
-2024-03-26 21:35:27 - 192.168.1.192 - - [26/Mar/2024 21:35:27] "GET / HTTP/1.1" 200 -
-2024-03-26 21:35:27 - 192.168.1.192 - - [26/Mar/2024 21:35:27] "GET /static/styles.css HTTP/1.1" 200 -
-2024-03-26 21:35:47 - Added feeding time: 21:36
-2024-03-26 21:35:47 - 192.168.1.192 - - [26/Mar/2024 21:35:47] "[32mPOST /add HTTP/1.1[0m" 302 -
-2024-03-26 21:35:48 - 192.168.1.192 - - [26/Mar/2024 21:35:48] "GET / HTTP/1.1" 200 -
-2024-03-26 21:35:48 - 192.168.1.192 - - [26/Mar/2024 21:35:48] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
-2024-03-26 21:36:00 - Feeding the pet
-2024-03-26 21:52:01 - 192.168.1.172 - - [26/Mar/2024 21:52:01] "GET / HTTP/1.1" 200 -
-2024-03-26 21:52:01 - 192.168.1.172 - - [26/Mar/2024 21:52:01] "GET /static/styles.css HTTP/1.1" 200 -
-2024-03-26 22:02:00 - Feeding the pet
-2024-03-26 22:03:00 - Feeding the pet
-2024-03-26 22:06:06 - Added feeding time: 02:00
-2024-03-26 22:06:06 - 192.168.1.172 - - [26/Mar/2024 22:06:06] "[32mPOST /add HTTP/1.1[0m" 302 -
-2024-03-26 22:06:06 - Added feeding time: 02:00
-2024-03-26 22:06:06 - 192.168.1.172 - - [26/Mar/2024 22:06:06] "[32mPOST /add HTTP/1.1[0m" 302 -
-2024-03-26 22:06:07 - 192.168.1.172 - - [26/Mar/2024 22:06:07] "GET / HTTP/1.1" 200 -
-2024-03-26 22:06:07 - 192.168.1.172 - - [26/Mar/2024 22:06:07] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
-2024-03-26 22:06:11 - Deleted feeding time: 02:00
-2024-03-26 22:06:11 - 192.168.1.172 - - [26/Mar/2024 22:06:11] "[32mPOST /delete HTTP/1.1[0m" 302 -
-2024-03-26 22:06:11 - 192.168.1.172 - - [26/Mar/2024 22:06:11] "GET / HTTP/1.1" 200 -
-2024-03-26 22:06:12 - 192.168.1.172 - - [26/Mar/2024 22:06:12] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
-2024-03-26 22:06:13 - Deleted feeding time: 21:36
-2024-03-26 22:06:13 - 192.168.1.172 - - [26/Mar/2024 22:06:13] "[32mPOST /delete HTTP/1.1[0m" 302 -
-2024-03-26 22:06:14 - 192.168.1.172 - - [26/Mar/2024 22:06:14] "GET / HTTP/1.1" 200 -
-2024-03-26 22:06:14 - 192.168.1.172 - - [26/Mar/2024 22:06:14] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
-2024-03-26 22:06:38 - Deleted feeding time: 22:03
-2024-03-26 22:06:38 - 192.168.1.172 - - [26/Mar/2024 22:06:38] "[32mPOST /delete HTTP/1.1[0m" 302 -
-2024-03-26 22:06:39 - 192.168.1.172 - - [26/Mar/2024 22:06:39] "GET / HTTP/1.1" 200 -
-2024-03-26 22:06:39 - 192.168.1.172 - - [26/Mar/2024 22:06:39] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
-2024-03-26 22:06:40 - Deleted feeding time: 02:02
-2024-03-26 22:06:40 - 192.168.1.172 - - [26/Mar/2024 22:06:40] "[32mPOST /delete HTTP/1.1[0m" 302 -
-2024-03-26 22:06:41 - 192.168.1.172 - - [26/Mar/2024 22:06:41] "GET / HTTP/1.1" 200 -
-2024-03-26 22:06:41 - 192.168.1.172 - - [26/Mar/2024 22:06:41] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
-2024-03-26 22:09:48 - 192.168.1.172 - - [26/Mar/2024 22:09:48] "GET / HTTP/1.1" 200 -
-2024-03-26 22:09:48 - 192.168.1.172 - - [26/Mar/2024 22:09:48] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
-2024-03-26 22:09:53 - 192.168.1.172 - - [26/Mar/2024 22:09:53] "GET / HTTP/1.1" 200 -
-2024-03-26 22:09:53 - 192.168.1.172 - - [26/Mar/2024 22:09:53] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
-2024-03-27 02:00:00 - Feeding the pet
-2024-03-27 02:02:00 - Feeding the pet
-2024-03-27 15:34:45 - 192.168.1.192 - - [27/Mar/2024 15:34:45] "GET / HTTP/1.1" 200 -
-2024-03-27 15:34:45 - 192.168.1.192 - - [27/Mar/2024 15:34:45] "GET /static/styles.css HTTP/1.1" 200 -
-2024-03-27 15:34:49 - 192.168.1.192 - - [27/Mar/2024 15:34:49] "GET / HTTP/1.1" 200 -
-2024-03-27 15:34:50 - 192.168.1.192 - - [27/Mar/2024 15:34:50] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
-2024-03-27 15:35:11 - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
- * Running on all addresses (0.0.0.0)
- * Running on http://127.0.0.1:5000
- * Running on http://192.168.1.192:5000
-2024-03-27 15:35:11 - [33mPress CTRL+C to quit[0m
-2024-03-27 15:35:11 -  * Restarting with stat
-2024-03-27 15:35:11 -  * Debugger is active!
-2024-03-27 15:35:11 -  * Debugger PIN: 375-076-903
-2024-03-27 15:35:14 - 192.168.1.192 - - [27/Mar/2024 15:35:14] "GET / HTTP/1.1" 200 -
-2024-03-27 15:35:15 - 192.168.1.192 - - [27/Mar/2024 15:35:15] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
-2024-03-27 15:35:15 - 192.168.1.192 - - [27/Mar/2024 15:35:15] "GET / HTTP/1.1" 200 -
-2024-03-27 15:35:15 - 192.168.1.192 - - [27/Mar/2024 15:35:15] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
-2024-03-27 15:35:16 - 192.168.1.192 - - [27/Mar/2024 15:35:16] "GET / HTTP/1.1" 200 -
-2024-03-27 15:35:16 - 192.168.1.192 - - [27/Mar/2024 15:35:16] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
-2024-03-27 15:35:16 - 192.168.1.192 - - [27/Mar/2024 15:35:16] "GET / HTTP/1.1" 200 -
-2024-03-27 15:35:16 - 192.168.1.192 - - [27/Mar/2024 15:35:16] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
-2024-03-27 15:43:31 -  * Detected change in '/home/jasonadmin/GithubRepos/PetFeedr/PetFeedr.py', reloading
-2024-03-27 15:56:46 - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
- * Running on all addresses (0.0.0.0)
- * Running on http://127.0.0.1:5000
- * Running on http://192.168.1.192:5000
-2024-03-27 15:56:46 - [33mPress CTRL+C to quit[0m
-2024-03-27 15:56:46 -  * Restarting with stat
-2024-03-27 15:56:46 -  * Debugger is active!
-2024-03-27 15:56:46 -  * Debugger PIN: 375-076-903
-2024-03-27 15:56:49 - 192.168.1.192 - - [27/Mar/2024 15:56:49] "GET / HTTP/1.1" 200 -
-2024-03-27 15:56:49 - 192.168.1.192 - - [27/Mar/2024 15:56:49] "GET /static/styles.css HTTP/1.1" 200 -
-2024-03-27 16:01:12 -  * Detected change in '/home/jasonadmin/GithubRepos/PetFeedr/web_interface.py', reloading
-2024-03-27 16:01:41 - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
- * Running on all addresses (0.0.0.0)
- * Running on http://127.0.0.1:5000
- * Running on http://192.168.1.192:5000
-2024-03-27 16:01:41 - [33mPress CTRL+C to quit[0m
-2024-03-27 16:01:41 -  * Restarting with stat
-2024-03-27 16:01:42 -  * Debugger is active!
-2024-03-27 16:01:42 -  * Debugger PIN: 375-076-903
-2024-03-27 16:01:43 - 192.168.1.192 - - [27/Mar/2024 16:01:43] "GET / HTTP/1.1" 200 -
-2024-03-27 16:01:43 - 192.168.1.192 - - [27/Mar/2024 16:01:43] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
-2024-03-27 16:01:43 - 192.168.1.192 - - [27/Mar/2024 16:01:43] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
-2024-03-27 16:01:45 - Feeding the pet
-2024-03-27 16:01:45 - Manually fed the pet
-2024-03-27 16:01:45 - 192.168.1.192 - - [27/Mar/2024 16:01:45] "[32mPOST /feed HTTP/1.1[0m" 302 -
-2024-03-27 16:01:45 - 192.168.1.192 - - [27/Mar/2024 16:01:45] "GET / HTTP/1.1" 200 -
-2024-03-27 16:01:46 - 192.168.1.192 - - [27/Mar/2024 16:01:46] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
-2024-03-27 16:02:13 - Added feeding time: 16:05
-2024-03-27 16:02:13 - 192.168.1.192 - - [27/Mar/2024 16:02:13] "[32mPOST /add HTTP/1.1[0m" 302 -
-2024-03-27 16:02:13 - 192.168.1.192 - - [27/Mar/2024 16:02:13] "GET / HTTP/1.1" 200 -
-2024-03-27 16:02:13 - 192.168.1.192 - - [27/Mar/2024 16:02:13] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
-2024-03-27 16:02:20 - Feeding the pet
-2024-03-27 16:02:20 - Manually fed the pet
-2024-03-27 16:02:20 - 192.168.1.192 - - [27/Mar/2024 16:02:20] "[32mPOST /feed HTTP/1.1[0m" 302 -
-2024-03-27 16:02:20 - 192.168.1.192 - - [27/Mar/2024 16:02:20] "GET / HTTP/1.1" 200 -
-2024-03-27 16:02:20 - 192.168.1.192 - - [27/Mar/2024 16:02:20] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
-2024-03-27 16:02:51 - 192.168.1.192 - - [27/Mar/2024 16:02:51] "GET / HTTP/1.1" 200 -
-2024-03-27 16:02:51 - 192.168.1.192 - - [27/Mar/2024 16:02:51] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
-2024-03-27 16:03:00 - 192.168.1.192 - - [27/Mar/2024 16:03:00] "GET / HTTP/1.1" 200 -
-2024-03-27 16:03:00 - 192.168.1.192 - - [27/Mar/2024 16:03:00] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
-2024-03-27 16:03:36 - 192.168.1.192 - - [27/Mar/2024 16:03:36] "GET / HTTP/1.1" 200 -
-2024-03-27 16:03:36 - 192.168.1.192 - - [27/Mar/2024 16:03:36] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
-2024-03-27 16:05:00 - Feeding the pet
-2024-03-27 16:05:02 - 192.168.1.192 - - [27/Mar/2024 16:05:02] "GET / HTTP/1.1" 200 -
-2024-03-27 16:05:02 - 192.168.1.192 - - [27/Mar/2024 16:05:02] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
-2024-03-27 16:05:09 - Feeding the pet
-2024-03-27 16:05:09 - Manually fed the pet
-2024-03-27 16:05:09 - 192.168.1.192 - - [27/Mar/2024 16:05:09] "[32mPOST /feed HTTP/1.1[0m" 302 -
-2024-03-27 16:05:09 - 192.168.1.192 - - [27/Mar/2024 16:05:09] "GET / HTTP/1.1" 200 -
-2024-03-27 16:05:09 - 192.168.1.192 - - [27/Mar/2024 16:05:09] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
-2024-03-27 16:05:19 - 192.168.1.192 - - [27/Mar/2024 16:05:19] "GET / HTTP/1.1" 200 -
-2024-03-27 16:05:19 - 192.168.1.192 - - [27/Mar/2024 16:05:19] "GET /static/styles.css HTTP/1.1" 200 -
-2024-03-27 16:05:50 - 192.168.1.192 - - [27/Mar/2024 16:05:50] "GET / HTTP/1.1" 200 -
-2024-03-27 16:05:50 - 192.168.1.192 - - [27/Mar/2024 16:05:50] "GET /static/styles.css HTTP/1.1" 200 -
-2024-03-27 16:06:08 - 192.168.1.192 - - [27/Mar/2024 16:06:08] "GET / HTTP/1.1" 200 -
-2024-03-27 16:06:08 - 192.168.1.192 - - [27/Mar/2024 16:06:08] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
-2024-03-27 16:06:20 - 192.168.1.192 - - [27/Mar/2024 16:06:20] "GET / HTTP/1.1" 200 -
-2024-03-27 16:06:20 - 192.168.1.192 - - [27/Mar/2024 16:06:20] "GET /static/styles.css HTTP/1.1" 200 -
-2024-03-27 16:06:29 - 192.168.1.192 - - [27/Mar/2024 16:06:29] "GET / HTTP/1.1" 200 -
-2024-03-27 16:06:29 - 192.168.1.192 - - [27/Mar/2024 16:06:29] "GET /static/styles.css HTTP/1.1" 200 -
-2024-03-27 16:06:48 - 192.168.1.192 - - [27/Mar/2024 16:06:48] "GET / HTTP/1.1" 200 -
-2024-03-27 16:06:48 - 192.168.1.192 - - [27/Mar/2024 16:06:48] "GET /static/styles.css HTTP/1.1" 200 -
-2024-03-27 16:06:58 - 192.168.1.192 - - [27/Mar/2024 16:06:58] "GET / HTTP/1.1" 200 -
-2024-03-27 16:06:58 - 192.168.1.192 - - [27/Mar/2024 16:06:58] "GET /static/styles.css HTTP/1.1" 200 -
+2024-03-27 16:35:15 - [33mPress CTRL+C to quit[0m
+2024-03-27 16:35:15 -  * Restarting with stat
+2024-03-27 16:35:15 -  * Debugger is active!
+2024-03-27 16:35:15 -  * Debugger PIN: 375-076-903
+2024-03-27 16:35:18 - 192.168.1.192 - - [27/Mar/2024 16:35:18] "GET / HTTP/1.1" 200 -
+2024-03-27 16:35:18 - 192.168.1.192 - - [27/Mar/2024 16:35:18] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
