@@ -3,6 +3,7 @@ import schedule
 import logging
 import subprocess
 from servo_control import control_servo
+from SecretKey import VALID_USER_ID, VALID_PASSWORD
 
 # Configure logging
 logging.basicConfig(filename='feeding_log.txt', level=logging.INFO,
@@ -36,10 +37,7 @@ def run_web_interface():
     subprocess.Popen(["python3", "web_interface.py"])
 
 def validate_login(user_id, password):
-    # Replace with your actual logic for validating the user_id and password
-    valid_user_ids = ["admin"]
-    valid_passwords = ["password"]
-    return user_id in valid_user_ids and password in valid_passwords
+    return user_id == VALID_USER_ID and password == VALID_PASSWORD
 
 def main():
     run_web_interface() # Start web server

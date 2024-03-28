@@ -2,6 +2,7 @@ body {
     background-color: #e0dfd0;
 }
 
+
 .pet {
     color: lightcoral;
     font-weight: bold;
@@ -10,4 +11,10 @@ body {
 .feedr {
     color: darkcyan;
     font-style: italic;
+}
+
+#login-button {
+    position: absolute;
+    top: 10px;
+    right: 10px;
 }
