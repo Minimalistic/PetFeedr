@@ -1,2 +1,13 @@
+body {
+    background-color: #e0dfd0;
+}
 
+.pet {
+    color: lightcoral;
+    font-weight: bold;
+}
 
+.feedr {
+    color: darkcyan;
+    font-style: italic;
+}
