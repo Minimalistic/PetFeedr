@@ -2,7 +2,7 @@ import time
 import schedule
 import logging
 import subprocess
-from servo_control import control_servo
+from servo_controller import trigger_servo
 from SecretKey import VALID_USER_ID, VALID_PASSWORD
 from multiprocessing import Process
 
@@ -11,8 +11,13 @@ logging.basicConfig(filename='feeding_log.txt', level=logging.INFO,
                     format='%(asctime)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
 def feed_pet():
-    control_servo()
-    logging.info("Feeding the pet! 🐱")
+    try:
+        # Dispense food to the pet using the servo
+        logging.info("Triggering Servo to feed the pet! 🐱")
+        trigger_servo()
+        logging.info("Food dispensed successfully!")
+    except Exception as e:
+        logging.error(f"Error feeding pet: {str(e)}")
 
 def setup_schedule():
     # Currently no pre-populated schedules, keeping around as I believe it's used by the web interface

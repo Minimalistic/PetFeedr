@@ -6,7 +6,7 @@ import schedule
 import time
 import logging
 from threading import Thread
-from PetFeedr import validate_login
+from PetFeedr import validate_login, feed_pet
 from SecretKey import SECRET_KEY
 
 app = Flask(__name__)
@@ -115,16 +115,12 @@ def delete_job():
         logging.error(f"Error deleting feeding time: {str(e)}")
         return "An error occurred while deleting the feeding time.", 500
 
+
 @app.route('/feed', methods=['POST'])
 @login_required
-def manual_feeding():
+def trigger_feeding():
     feed_pet()
-    logging.info("Manually fed the pet")
     return redirect('/')
-
-def feed_pet():
-    # TODO: Replace this with actual servo control
-    logging.info("Feeding the pet")
 
 def main():
     schedule_thread = Thread(target=run_schedule)
