@@ -42,15 +42,8 @@ def validate_login(user_id, password):
     return user_id == VALID_USER_ID and password == VALID_PASSWORD
 
 def main():
-    # Create a Process for the web interface
-    web_interface_process = Process(target=run_web_interface)
-    web_interface_process.start()
-
-    # Run the PetFeedr in the main process
-    run()
-
-    # Wait for the web interface process to finish
-    web_interface_process.join()
+    run_web_interface() # Start web server
+    run() # Run PetFeedr
 
 if __name__ == "__main__":
     main()

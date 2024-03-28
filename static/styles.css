@@ -2,7 +2,6 @@ body {
     background-color: #e0dfd0;
 }
 
-
 .pet {
     color: lightcoral;
     font-weight: bold;
@@ -17,4 +16,12 @@ body {
     position: absolute;
     top: 10px;
     right: 10px;
+}
+
+/* Styling the feeding times and log window */
+pre { 
+    background-color: white;
+    padding: 10px;
+    border-radius: 5px;
+    overflow-x: auto;
 }

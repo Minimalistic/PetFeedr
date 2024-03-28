@@ -13,20 +13,21 @@
         {% else %}
             <a href="{{ url_for('login') }}" id="session-button">Login</a>
         {% endif %}
-
         <h2>Scheduled Feeding Times:</h2>
         <ul>
             {% for job in scheduled_jobs %}
             <li>
                 {{ job }}
+                {% if current_user.is_authenticated %}
                 <form action="/delete" method="post" style="display: inline;">
                     <input type="hidden" name="job_time" value="{{ job }}">
                     <input type="submit" value="Delete">
                 </form>
+                {% endif %}
             </li>
             {% endfor %}
         </ul>
-
+        {% if current_user.is_authenticated %}
         <h2>Add New Feeding Time:</h2>
         <form action="/add" method="post">
             <input type="number" name="hour" min="0" max="23" placeholder="Hour" required>
@@ -37,6 +38,7 @@
         <form action="/feed" method="post">
             <input type="submit" value="Trigger a one time feeding">
         </form>
+        {% endif %}
         <h2>Log Messages:</h2>
         <pre>{{ log_messages }}</pre>
     </body>
