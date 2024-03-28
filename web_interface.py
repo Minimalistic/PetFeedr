@@ -72,6 +72,7 @@ def logout():
     return redirect(url_for('index'))  # Redirect to the main page after logout
 
 @app.route('/add', methods=['POST'])
+@login_required
 def add_job():
     hour = request.form['hour'].zfill(2)
     minute = request.form['minute'].zfill(2)
@@ -90,6 +91,7 @@ def add_job():
         return "An error occurred while adding the feeding time.", 500
 
 @app.route('/delete', methods=['POST'])
+@login_required
 def delete_job():
     job_time = request.form['job_time']
     try:

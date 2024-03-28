@@ -4,6 +4,7 @@ import logging
 import subprocess
 from servo_control import control_servo
 from SecretKey import VALID_USER_ID, VALID_PASSWORD
+from multiprocessing import Process
 
 # Configure logging
 logging.basicConfig(filename='feeding_log.txt', level=logging.INFO,
@@ -19,6 +20,7 @@ def setup_schedule():
 
 def run():
     # Load feeding times from file
+    # TODO has no validation for duplicates
     try:
         with open('feeding_schedules.txt', 'r') as file:
             for line in file:
@@ -40,8 +42,15 @@ def validate_login(user_id, password):
     return user_id == VALID_USER_ID and password == VALID_PASSWORD
 
 def main():
-    run_web_interface() # Start web server
-    run() # Run PetFeedr
+    # Create a Process for the web interface
+    web_interface_process = Process(target=run_web_interface)
+    web_interface_process.start()
+
+    # Run the PetFeedr in the main process
+    run()
+
+    # Wait for the web interface process to finish
+    web_interface_process.join()
 
 if __name__ == "__main__":
     main()

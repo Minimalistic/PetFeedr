@@ -13,7 +13,7 @@ body {
     font-style: italic;
 }
 
-#login-button {
+#session-button {
     position: absolute;
     top: 10px;
     right: 10px;
