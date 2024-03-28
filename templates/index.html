@@ -7,6 +7,12 @@
         </head>
     <body>
         <h1><span class="pet">Pet</span><span class="feedr">Feedr</span></h1>
+        {% if current_user.is_authenticated %}
+            <p>Welcome, {{ current_user.id }}!</p>
+            <a href="{{ url_for('logout') }}">Logout</a>
+        {% else %}
+            <a href="{{ url_for('login') }}">Login</a>
+        {% endif %}
 
         <h2>Scheduled Feeding Times:</h2>
         <ul>

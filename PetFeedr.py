@@ -35,6 +35,15 @@ def run():
 def run_web_interface():
     subprocess.Popen(["python3", "web_interface.py"])
 
-if __name__ == "__main__":
+def validate_login(user_id, password):
+    # Replace with your actual logic for validating the user_id and password
+    valid_user_ids = ["admin"]
+    valid_passwords = ["password"]
+    return user_id in valid_user_ids and password in valid_passwords
+
+def main():
     run_web_interface() # Start web server
     run() # Run PetFeedr
+
+if __name__ == "__main__":
+    main()
