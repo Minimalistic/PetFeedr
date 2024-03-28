@@ -1,23 +1,2 @@
-/* Default styles for mobile */
-body {
-    margin: 0 auto;
-    width: 100%;
-    font-size: 1.5rem; /* Increase the font size for mobile */
-/*     word-wrap: break-word; /* Add this line */
-}
-
-/* Other elements */
-h1 {
-    font-size: 2.5rem;
-}
-
-p {
-    font-size: 1rem;
-    margin: 1rem 0;
-}
-
-pre {
-    font-size: .75rem;
-}
 
 
