@@ -44,3 +44,47 @@
 2024-03-28 07:14:06 - 192.168.1.192 - - [28/Mar/2024 07:14:06] "[32mPOST /feed HTTP/1.1[0m" 302 -
 2024-03-28 07:14:06 - 192.168.1.192 - - [28/Mar/2024 07:14:06] "GET / HTTP/1.1" 200 -
 2024-03-28 07:14:06 - 192.168.1.192 - - [28/Mar/2024 07:14:06] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
+2024-03-28 16:47:51 - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.1.192:5000
+2024-03-28 16:47:51 - [33mPress CTRL+C to quit[0m
+2024-03-28 16:47:51 -  * Restarting with stat
+2024-03-28 16:47:52 -  * Debugger is active!
+2024-03-28 16:47:52 -  * Debugger PIN: 519-344-607
+2024-03-28 16:47:52 - 192.168.1.192 - - [28/Mar/2024 16:47:52] "GET / HTTP/1.1" 200 -
+2024-03-28 16:47:52 - 192.168.1.192 - - [28/Mar/2024 16:47:52] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
+2024-03-28 16:47:55 - Feeding the pet
+2024-03-28 16:47:55 - Manually fed the pet
+2024-03-28 16:47:55 - 192.168.1.192 - - [28/Mar/2024 16:47:55] "[32mPOST /feed HTTP/1.1[0m" 302 -
+2024-03-28 16:47:55 - 192.168.1.192 - - [28/Mar/2024 16:47:55] "GET / HTTP/1.1" 200 -
+2024-03-28 16:47:55 - 192.168.1.192 - - [28/Mar/2024 16:47:55] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
+2024-03-28 16:48:31 -  * Detected change in '/home/jasonadmin/GithubRepos/PetFeedr/web_interface.py', reloading
+2024-03-28 16:50:11 - Loaded feeding time: 02:02
+2024-03-28 16:50:11 - Loaded feeding time: 21:01
+2024-03-28 16:50:11 - Loaded feeding time: 22:00
+2024-03-28 16:50:11 - Loaded feeding time: 23:00
+2024-03-28 16:50:11 - Loaded feeding time: 01:00
+2024-03-28 16:50:11 - Loaded feeding time: 02:00
+2024-03-28 16:50:11 - Loaded feeding time: 09:01
+2024-03-28 16:50:11 - Loaded feeding time: 00:05
+2024-03-28 16:50:11 - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.1.192:5000
+2024-03-28 16:50:11 - [33mPress CTRL+C to quit[0m
+2024-03-28 16:50:11 -  * Restarting with stat
+2024-03-28 16:50:11 -  * Debugger is active!
+2024-03-28 16:50:11 -  * Debugger PIN: 519-344-607
+2024-03-28 16:50:13 - 192.168.1.192 - - [28/Mar/2024 16:50:13] "GET / HTTP/1.1" 200 -
+2024-03-28 16:50:13 - 192.168.1.192 - - [28/Mar/2024 16:50:13] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
+2024-03-28 16:50:17 - Feeding the pet
+2024-03-28 16:50:17 - Manually fed the pet
+2024-03-28 16:50:17 - 192.168.1.192 - - [28/Mar/2024 16:50:17] "[32mPOST /feed HTTP/1.1[0m" 302 -
+2024-03-28 16:50:17 - 192.168.1.192 - - [28/Mar/2024 16:50:17] "GET / HTTP/1.1" 200 -
+2024-03-28 16:50:17 - 192.168.1.192 - - [28/Mar/2024 16:50:17] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -
+2024-03-28 16:50:21 - Feeding the pet
+2024-03-28 16:50:21 - Manually fed the pet
+2024-03-28 16:50:21 - 192.168.1.192 - - [28/Mar/2024 16:50:21] "[32mPOST /feed HTTP/1.1[0m" 302 -
+2024-03-28 16:50:21 - 192.168.1.192 - - [28/Mar/2024 16:50:21] "GET / HTTP/1.1" 200 -
+2024-03-28 16:50:21 - 192.168.1.192 - - [28/Mar/2024 16:50:21] "[36mGET /static/styles.css HTTP/1.1[0m" 304 -

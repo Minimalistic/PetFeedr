@@ -117,7 +117,7 @@ def delete_job():
 
 @app.route('/feed', methods=['POST'])
 @login_required
-def feed_now():
+def manual_feeding():
     feed_pet()
     logging.info("Manually fed the pet")
     return redirect('/')
