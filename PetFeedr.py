@@ -1,21 +1,21 @@
-import time
 import schedule
 import logging
 import subprocess
 from servo_controller import trigger_servo
 from SecretKey import VALID_USER_ID, VALID_PASSWORD
-from multiprocessing import Process
 
 # Configure logging
 logging.basicConfig(filename='feeding_log.txt', level=logging.INFO,
                     format='%(asctime)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
-def feed_pet():
+def feed_pet(is_scheduled=False):
     try:
         # Dispense food to the pet using the servo
-        logging.info("Triggering Servo to feed the pet! 🐱")
         trigger_servo()
-        logging.info("Food dispensed successfully!")
+        logging.info("Triggering Servo to feed the pet")
+        logging.info(" > ^ <")
+        logging.info("( o.o ) Food dispensed successfully!")
+        logging.info(" /\_/\ ")
     except Exception as e:
         logging.error(f"Error feeding pet: {str(e)}")
 
@@ -28,10 +28,14 @@ def run():
     # TODO has no validation for duplicates
     try:
         with open('feeding_schedules.txt', 'r') as file:
-            for line in file:
-                hour, minute = line.strip().split(':')
-                schedule.every().day.at(f"{hour}:{minute}").do(feed_pet)
-                logging.info(f"Loaded feeding time: {hour}:{minute}")  # Log the loaded feeding time
+            lines = file.readlines()
+            if len(lines) == 0:
+                logging.warning("feeding_schedules.txt is empty. Starting with an empty schedule.")
+            else:
+                for line in lines:
+                    hour, minute = line.strip().split(':')
+                    schedule.every().day.at(f"{hour}:{minute}").do(feed_pet)
+                    logging.info(f"Event found in schedules file! - Added: {hour}:{minute}")  # Log the loaded feeding time
     except FileNotFoundError:
         logging.warning("feeding_schedules.txt not found. Starting with an empty schedule.")
     except Exception as e:

@@ -1,7 +1,16 @@
 #!/usr/bin/env python3
 
-from flask import Flask, session, redirect, url_for, request, render_template
-from flask_login import LoginManager, UserMixin, current_user, login_required, login_user, logout_user
+from flask import Flask,        \
+                    redirect,   \
+                    url_for,    \
+                    request,    \
+                    render_template
+from flask_login import LoginManager,       \
+                            UserMixin,      \
+                            current_user,   \
+                            login_required, \
+                            login_user,     \
+                            logout_user
 import schedule
 import time
 import logging
@@ -114,7 +123,6 @@ def delete_job():
     except Exception as e:
         logging.error(f"Error deleting feeding time: {str(e)}")
         return "An error occurred while deleting the feeding time.", 500
-
 
 @app.route('/feed', methods=['POST'])
 @login_required
