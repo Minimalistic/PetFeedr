@@ -27,6 +27,8 @@ class User(UserMixin):
     def __init__(self, id):
         self.id = id
 
+from datetime import datetime
+
 # Function to read and format feeding times from a file
 def read_and_format_times(filename):
     with open(filename, 'r') as file:
@@ -38,8 +40,17 @@ def read_and_format_times(filename):
     # Convert to datetime objects
     times = [datetime.strptime(time, "%H:%M") for time in times]
 
+    # Sort the feeding times by time
+    times.sort()
+
     # Convert to 12-hour format
     times = [time.strftime("%I:%M %p") for time in times]
+
+    # Find the index of the first PM time
+    pm_index = next((i for i, time in enumerate(times) if 'PM' in time), len(times))
+
+    # Insert a separator at the PM index so it's easier to parse in the UI (Actual separator is in index > jinja)
+    times.insert(pm_index, '-separator-')
 
     return times
 
@@ -67,14 +78,8 @@ def unauthorized(e):
 # Route for the home page
 @app.route('/')
 def index():
-    # Read the scheduled jobs from feeding_schedules.txt
-    scheduled_jobs = []
-    try:
-        with open('feeding_schedules.txt', 'r') as file:
-            for line in file:
-                scheduled_jobs.append(line.strip())
-    except FileNotFoundError:
-        pass
+    # Read and format the scheduled jobs from feeding_schedules.txt
+    scheduled_jobs = read_and_format_times('feeding_schedules.txt')
 
     with open('feeding_log.txt', 'r') as file:
         log_messages = file.readlines()
@@ -123,8 +128,9 @@ def add_job():
             file.write(f"{feeding_time}\n")
             file.flush()
 
-        # Log the added feeding time
-        logging.info(f"Added feeding time: {feeding_time}")
+        # Log the added feeding time in 12-hour format
+        feeding_time_12h = datetime.strptime(feeding_time, "%H:%M").strftime("%I:%M %p")
+        logging.info(f"Added feeding time: {feeding_time_12h}")
 
         return redirect('/')
 
@@ -134,16 +140,19 @@ def add_job():
     except Exception as e:
         logging.error(f"Error writing to feeding_schedules.txt: {str(e)}")
         return "An error occurred while adding the feeding time.", 500
-
+    
 # Route for deleting a feeding job
 @app.route('/delete', methods=['POST'])
 @login_required
 def delete_job():
     job_time = request.form['job_time']
     try:
+        # Convert the job time back to 24-hour format
+        job_time_24h = datetime.strptime(job_time, "%I:%M %p").strftime("%H:%M")
+
         # Remove the job from the schedule
         for job in schedule.jobs:
-            if job.at_time.strftime('%H:%M') == job_time:
+            if job.at_time.strftime('%H:%M') == job_time_24h:
                 schedule.cancel_job(job)
                 break
 
@@ -152,7 +161,7 @@ def delete_job():
             lines = file.readlines()
         with open('feeding_schedules.txt', 'w') as file:
             for line in lines:
-                if line.strip() != job_time:
+                if line.strip() != job_time_24h:
                     file.write(line)
 
         logging.info(f"Deleted feeding time: {job_time}")
@@ -160,7 +169,7 @@ def delete_job():
     except Exception as e:
         logging.error(f"Error deleting feeding time: {str(e)}")
         return "An error occurred while deleting the feeding time.", 500
-
+    
 # Route for triggering a feeding manually
 @app.route('/feed', methods=['POST'])
 @login_required

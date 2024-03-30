@@ -21,16 +21,20 @@
         <h2>Scheduled Feeding Times:</h2>
         <ul>
             {% for job in scheduled_jobs %}
-            <li>
-                {{ job }}
-                {% if current_user.is_authenticated %}
-                <!-- Delete button for authenticated users -->
-                <form action="/delete" method="post" style="display: inline;">
-                    <input type="hidden" name="job_time" value="{{ job }}">
-                    <input type="submit" value="Delete">
-                </form>
+                {% if job == '-separator-' %}
+                    <p>------AM/PM------</p>
+                {% else %}
+                    <li>
+                        {{ job }}
+                        {% if current_user.is_authenticated %}
+                        <!-- Delete button for authenticated users -->
+                        <form action="/delete" method="post" style="display: inline;">
+                            <input type="hidden" name="job_time" value="{{ job }}">
+                            <input type="submit" value="Delete">
+                        </form>
+                        {% endif %}
+                    </li>
                 {% endif %}
-            </li>
             {% endfor %}
         </ul>
         
