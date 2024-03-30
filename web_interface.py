@@ -17,6 +17,7 @@ import logging
 from threading import Thread
 from PetFeedr import validate_login, feed_pet
 from SecretKeys import PETFEEDR_SECRET_KEY
+from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = PETFEEDR_SECRET_KEY
@@ -24,9 +25,28 @@ app.secret_key = PETFEEDR_SECRET_KEY
 login_manager = LoginManager()
 login_manager.init_app(app)
 
+@app.template_filter('strftime')
+def _jinja2_filter_datetime(value, format=None):
+    return value
+
 class User(UserMixin):
     def __init__(self, id):
         self.id = id
+
+def read_and_format_times(filename):
+    with open(filename, 'r') as file:
+        times = file.readlines()
+
+    # Remove newline characters
+    times = [time.strip() for time in times]
+
+    # Convert to datetime objects
+    times = [datetime.strptime(time, "%H:%M") for time in times]
+
+    # Convert to 12-hour format
+    times = [time.strftime("%I:%M %p") for time in times]
+
+    return times
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -83,22 +103,23 @@ def logout():
 @app.route('/add', methods=['POST'])
 @login_required
 def add_job():
-    hour = request.form['hour'].zfill(2)
-    minute = request.form['minute'].zfill(2)
+    feeding_time = request.form['feeding_time']
+
     try:
-        schedule.every().day.at(f"{hour}:{minute}").do(feed_pet)
-        scheduled_time = f"{hour}:{minute}"
+        schedule.every().day.at(feeding_time).do(feed_pet)
         with open('feeding_schedules.txt', 'a') as file:
-            file.write(f"{scheduled_time}\n")
+            file.write(f"{feeding_time}\n")
             file.flush()
-        logging.info(f"Added feeding time: {scheduled_time}")
+        logging.info(f"Added feeding time: {feeding_time}")
         return redirect('/')
+
     except schedule.ScheduleValueError:
         return "Invalid time format. Please use HH:MM format.", 400
+
     except Exception as e:
         logging.error(f"Error writing to feeding_schedules.txt: {str(e)}")
         return "An error occurred while adding the feeding time.", 500
-
+    
 @app.route('/delete', methods=['POST'])
 @login_required
 def delete_job():
