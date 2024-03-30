@@ -3,6 +3,7 @@ import logging
 import subprocess
 import requests
 from servo_controller import trigger_servo
+
 from SecretKeys import PETFEEDR_USER_ID,            \
                         PETFEEDR_PASSWORD,      \
                         PUSHOVER_API_TOKEN,      \
@@ -13,9 +14,7 @@ logging.basicConfig(filename='feeding_log.txt', level=logging.INFO,
                     format='%(asctime)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
 def send_pushover_notification():
-    API_TOKEN = "PUSHOVER_API_TOKEN"
-    USER_KEY = "PUSHOVER_USER_KEY"
-    
+    # Send push notification using Pushover API
     url = "https://api.pushover.net/1/messages.json"
     data = {
         "token": PUSHOVER_API_TOKEN,
@@ -69,9 +68,11 @@ def run():
         schedule.run_pending()
 
 def run_web_interface():
+    # Start the web interface using subprocess
     subprocess.Popen(["python3", "web_interface.py"])
 
 def validate_login(user_id, password):
+    # Validate user login credentials
     return user_id == PETFEEDR_USER_ID and password == PETFEEDR_PASSWORD
 
 def main():

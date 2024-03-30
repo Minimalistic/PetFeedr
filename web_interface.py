@@ -1,16 +1,5 @@
-#!/usr/bin/env python3
-
-from flask import Flask,        \
-                    redirect,   \
-                    url_for,    \
-                    request,    \
-                    render_template
-from flask_login import LoginManager,       \
-                            UserMixin,      \
-                            current_user,   \
-                            login_required, \
-                            login_user,     \
-                            logout_user
+from flask import Flask, redirect, url_for, request, render_template
+from flask_login import LoginManager, UserMixin, current_user, login_required, login_user, logout_user
 import schedule
 import time
 import logging
@@ -19,20 +8,26 @@ from PetFeedr import validate_login, feed_pet
 from SecretKeys import PETFEEDR_SECRET_KEY
 from datetime import datetime
 
+#!/usr/bin/env python3
+
+
 app = Flask(__name__)
 app.secret_key = PETFEEDR_SECRET_KEY
 
 login_manager = LoginManager()
 login_manager.init_app(app)
 
+# Custom Jinja2 filter for formatting datetime objects
 @app.template_filter('strftime')
 def _jinja2_filter_datetime(value, format=None):
     return value
 
+# User class for Flask-Login
 class User(UserMixin):
     def __init__(self, id):
         self.id = id
 
+# Function to read and format feeding times from a file
 def read_and_format_times(filename):
     with open(filename, 'r') as file:
         times = file.readlines()
@@ -48,24 +43,28 @@ def read_and_format_times(filename):
 
     return times
 
+# User loader function for Flask-Login
 @login_manager.user_loader
 def load_user(user_id):
-    return User(user_id) # Return the user object for the given user_id
+    return User(user_id)
 
 # Configure logging
 logging.basicConfig(filename='feeding_log.txt', level=logging.INFO,
     format='%(asctime)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
+# Function to run the schedule in a separate thread
 def run_schedule():
     while True:
         schedule.run_pending()
         time.sleep(1)
 
+# Error handler for unauthorized access
 @app.errorhandler(401)
 def unauthorized(e):
-    # note that we set the 401 status explicitly
+    # Note that we set the 401 status explicitly
     return render_template('401.html'), 401
 
+# Route for the home page
 @app.route('/')
 def index():
     # Read the scheduled jobs from feeding_schedules.txt
@@ -82,6 +81,7 @@ def index():
     log_messages.reverse()
     return render_template('index.html', current_user=current_user, scheduled_jobs=scheduled_jobs, log_messages=''.join(log_messages))
 
+# Route for the login page
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -94,23 +94,38 @@ def login():
             return redirect(url_for('index'))  # Redirect to the main page after login
     return render_template('login.html')  # Render the login form
 
+# Route for logging out
 @app.route('/logout')
 @login_required
 def logout():
     logout_user()
     return redirect(url_for('index'))  # Redirect to the main page after logout
 
+# Route for adding a feeding job
 @app.route('/add', methods=['POST'])
 @login_required
 def add_job():
     feeding_time = request.form['feeding_time']
 
     try:
+        # Check if the feeding time already exists in feeding_schedules.txt
+        with open('feeding_schedules.txt', 'r') as file:
+            existing_times = file.readlines()
+        existing_times = [time.strip() for time in existing_times]
+        if feeding_time in existing_times:
+            return "Feeding time already exists. <a href='/'>Go back</a>", 400
+
+        # Add the feeding time to the schedule
         schedule.every().day.at(feeding_time).do(feed_pet)
+
+        # Write the feeding time to feeding_schedules.txt
         with open('feeding_schedules.txt', 'a') as file:
             file.write(f"{feeding_time}\n")
             file.flush()
+
+        # Log the added feeding time
         logging.info(f"Added feeding time: {feeding_time}")
+
         return redirect('/')
 
     except schedule.ScheduleValueError:
@@ -119,7 +134,8 @@ def add_job():
     except Exception as e:
         logging.error(f"Error writing to feeding_schedules.txt: {str(e)}")
         return "An error occurred while adding the feeding time.", 500
-    
+
+# Route for deleting a feeding job
 @app.route('/delete', methods=['POST'])
 @login_required
 def delete_job():
@@ -145,12 +161,14 @@ def delete_job():
         logging.error(f"Error deleting feeding time: {str(e)}")
         return "An error occurred while deleting the feeding time.", 500
 
+# Route for triggering a feeding manually
 @app.route('/feed', methods=['POST'])
 @login_required
 def trigger_feeding():
     feed_pet()
     return redirect('/')
 
+# Main function to start the application
 def main():
     schedule_thread = Thread(target=run_schedule)
     schedule_thread.start()
