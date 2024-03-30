@@ -1,12 +1,35 @@
 import schedule
 import logging
 import subprocess
+import requests
 from servo_controller import trigger_servo
-from SecretKey import VALID_USER_ID, VALID_PASSWORD
+from SecretKeys import PETFEEDR_USER_ID,            \
+                        PETFEEDR_PASSWORD,      \
+                        PUSHOVER_API_TOKEN,      \
+                        PUSHOVER_USER_KEY         
 
 # Configure logging
 logging.basicConfig(filename='feeding_log.txt', level=logging.INFO,
                     format='%(asctime)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+
+def send_pushover_notification():
+    API_TOKEN = "PUSHOVER_API_TOKEN"
+    USER_KEY = "PUSHOVER_USER_KEY"
+    
+    url = "https://api.pushover.net/1/messages.json"
+    data = {
+        "token": PUSHOVER_API_TOKEN,
+        "user": PUSHOVER_USER_KEY,
+        "title": "PetFeedr Alert",
+        "message": "PetFeedr dispensed food to your pet!"
+    }
+    
+    response = requests.post(url, data=data)
+    
+    if response.status_code == 200:
+        logging.info("Pushover notification sent successfully.")
+    else:
+        logging.info("Pushover failed to send notification.")
 
 def feed_pet(is_scheduled=False):
     try:
@@ -16,6 +39,7 @@ def feed_pet(is_scheduled=False):
         logging.info(" > ^ <")
         logging.info("( o.o ) Food dispensed successfully!")
         logging.info(" /\_/\ ")
+        send_pushover_notification()
     except Exception as e:
         logging.error(f"Error feeding pet: {str(e)}")
 
@@ -48,7 +72,7 @@ def run_web_interface():
     subprocess.Popen(["python3", "web_interface.py"])
 
 def validate_login(user_id, password):
-    return user_id == VALID_USER_ID and password == VALID_PASSWORD
+    return user_id == PETFEEDR_USER_ID and password == PETFEEDR_PASSWORD
 
 def main():
     run_web_interface() # Start web server
