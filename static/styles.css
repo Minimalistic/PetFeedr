@@ -45,7 +45,6 @@ pre {
     background-color: lightcoral;
 }
 
-
 @media screen and (max-width: 600px) {
     .general-button {
         font-size: 0.9em;

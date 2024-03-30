@@ -4,6 +4,7 @@
         <title>PetFeedr</title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles.css') }}">
+        <script src="main.js"></script>
     </head>
     <body>
         <!-- Page header -->
@@ -19,6 +20,7 @@
         
         <!-- Scheduled feeding times -->
         <h2>Scheduled Feeding Times:</h2>
+        <button onclick="toggleDeleteButtons()" class="general-button">Edit Schedule</button>
         <ul>
             {% for job in scheduled_jobs %}
                 {% if job == '-separator-' %}
@@ -28,7 +30,7 @@
                         {{ job }}
                         {% if current_user.is_authenticated %}
                         <!-- Delete button for authenticated users -->
-                        <form action="/delete" method="post" style="display: inline;">
+                        <form action="/delete" method="post" style="display: none;" class="delete-form">
                             <input type="hidden" name="job_time" value="{{ job }}">
                             <input class="general-button" type="submit" value="Delete">
                         </form>
@@ -56,5 +58,6 @@
         <!-- Log messages -->
         <h2>Log Messages:</h2>
         <pre>{{ log_messages }}</pre>
+        <script src="/static/main.js"></script>
     </body>
 </html>

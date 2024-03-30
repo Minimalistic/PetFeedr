@@ -10,7 +10,6 @@ from datetime import datetime
 
 #!/usr/bin/env python3
 
-
 app = Flask(__name__)
 app.secret_key = PETFEEDR_SECRET_KEY
 
