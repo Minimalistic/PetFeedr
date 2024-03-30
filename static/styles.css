@@ -25,3 +25,30 @@ pre {
     border-radius: 5px;
     overflow-x: auto;
 }
+
+.general-button {
+    display: inline-block;
+    padding: 0.8em 1.5em;
+    font-size: 1em;
+    font-weight: bold;
+    text-align: center;
+    text-decoration: none;
+    background-color: darkcyan;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.general-button:hover {
+    background-color: lightcoral;
+}
+
+
+@media screen and (max-width: 600px) {
+    .general-button {
+        font-size: 0.9em;
+        padding: 0.6em 1.2em;
+    }
+}

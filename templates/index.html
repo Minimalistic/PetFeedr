@@ -30,7 +30,7 @@
                         <!-- Delete button for authenticated users -->
                         <form action="/delete" method="post" style="display: inline;">
                             <input type="hidden" name="job_time" value="{{ job }}">
-                            <input type="submit" value="Delete">
+                            <input class="general-button" type="submit" value="Delete">
                         </form>
                         {% endif %}
                     </li>
@@ -43,13 +43,13 @@
         <h2>Add New Feeding Time:</h2>
         <form action="/add" method="post">
             <input type="time" name="feeding_time" required>
-            <input type="submit" value="Add">
+            <input class="general-button" type="submit" value="Add">
         </form>
         
         <!-- Manual feeding form -->
         <h6>Manual control</h6>
         <form action="/feed" method="post">
-            <input type="submit" value="Trigger a one time feeding">
+            <input class="general-button" type="submit" value="Trigger a one time feeding">
         </form>
         {% endif %}
         

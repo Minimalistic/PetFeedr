@@ -49,7 +49,7 @@ def read_and_format_times(filename):
     # Find the index of the first PM time
     pm_index = next((i for i, time in enumerate(times) if 'PM' in time), len(times))
 
-    # Insert a separator at the PM index so it's easier to parse in the UI (Actual separator is in index > jinja)
+    # Insert a separator at the PM index so it's easier to parse in the UI (Actual -separator- "pointer" is in index > jinja)
     times.insert(pm_index, '-separator-')
 
     return times
