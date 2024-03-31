@@ -21,14 +21,14 @@ delete_log_file('feeding_log.txt')
 logging.basicConfig(filename='feeding_log.txt', level=logging.INFO,
                     format='%(asctime)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
-def send_pushover_notification():
+def send_pushover_msg(title, message):
     # Send push notification using Pushover API
-    url     = "https://api.pushover.net/1/messages.json"
-    data    = {
-        "token"     : PUSHOVER_API_TOKEN,
-        "user"      : PUSHOVER_USER_KEY,
-        "title"     : "PetFeedr Alert",
-        "message"   : "PetFeedr dispensed food to your pet!"
+    url = "https://api.pushover.net/1/messages.json"
+    data = {
+        "token": PUSHOVER_API_TOKEN,
+        "user": PUSHOVER_USER_KEY,
+        "title": title,
+        "message": message
     }
     
     response = requests.post(url, data=data)
@@ -46,7 +46,8 @@ def feed_pet(is_scheduled=False):
         logging.info(" > ^ <")
         logging.info("( o.o ) Food dispensed successfully!")
         logging.info(" /\_/\💕")
-        send_pushover_notification()
+        send_pushover_msg(title="Petfeedr fed your pet!", \
+                                    message="Petfeedr fed your pet!")
     except Exception as e:
         logging.error(f"Error feeding pet: {str(e)}")
 
@@ -87,7 +88,9 @@ def validate_login(user_id, password):
 
 def main():
     run_web_interface() # Start web server
+    send_pushover_msg(title="Petfeedr has started!", \
+                                message="Petfeedr started successfully!")
     run() # Run PetFeedr
-
+    
 if __name__ == "__main__":
     main()
