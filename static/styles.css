@@ -18,7 +18,7 @@ body {
 /* styles the Login / Logout button */
 #session-button {
     position: absolute;
-    top: 10px;
+    top: 2.7em;
     right: 10px;
 }
 
