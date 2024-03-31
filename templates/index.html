@@ -7,57 +7,61 @@
         <script src="main.js"></script>
     </head>
     <body>
-        <!-- Page header -->
-        <h1><span class="pet">Pet</span><span class="feedr">Feedr</span></h1>
-        
-        <!-- User authentication -->
-        {% if current_user.is_authenticated %}
-            <p>Welcome, {{ current_user.id }}!</p>
-            <a href="{{ url_for('logout') }}" id="session-button">Logout</a>
-        {% else %}
-            <a href="{{ url_for('login') }}" id="session-button">Login</a>
-        {% endif %}
-        
-        <!-- Scheduled feeding times -->
-        <h2>Scheduled Feeding Times:</h2>
-        <button onclick="toggleDeleteButtons()" class="general-button">Edit Schedule</button>
-        <ul>
-            {% for job in scheduled_jobs %}
-                {% if job == '-separator-' %}
-                    <p>------AM/PM------</p>
-                {% else %}
-                    <li>
-                        {{ job }}
-                        {% if current_user.is_authenticated %}
-                        <!-- Delete button for authenticated users -->
-                        <form action="/delete" method="post" style="display: none;" class="delete-form">
-                            <input type="hidden" name="job_time" value="{{ job }}">
-                            <input class="general-button" type="submit" value="Delete">
-                        </form>
-                        {% endif %}
-                    </li>
-                {% endif %}
-            {% endfor %}
-        </ul>
-        
-        {% if current_user.is_authenticated %}
-        <!-- Add new feeding time form -->
-        <h2>Add New Feeding Time:</h2>
-        <form action="/add" method="post">
-            <input type="time" name="feeding_time" required>
-            <input class="general-button" type="submit" value="Add">
-        </form>
-        
-        <!-- Manual feeding form -->
-        <h6>Manual control</h6>
-        <form action="/feed" method="post">
-            <input class="general-button" type="submit" value="Trigger a one time feeding">
-        </form>
-        {% endif %}
-        
-        <!-- Log messages -->
-        <h2>Log Messages:</h2>
-        <pre>{{ log_messages }}</pre>
-        <script src="/static/main.js"></script>
+        <div class="app-window">
+            <!-- Page header -->
+            <h1><span class="pet">Pet</span><span class="feedr">Feedr</span></h1>
+            
+            <!-- User authentication -->
+            {% if current_user.is_authenticated %}
+                <p>Welcome, {{ current_user.id }}!</p>
+                <a href="{{ url_for('logout') }}" id="session-button">Logout</a>
+            {% else %}
+                <a href="{{ url_for('login') }}" id="session-button">Login</a>
+            {% endif %}
+            
+            <!-- Scheduled feeding times -->
+            <h2>Scheduled Feeding Times:</h2>
+            <ul class="text-panel">
+                {% for job in scheduled_jobs %}
+                    {% if job == '-separator-' %}
+                        <p>------AM/PM------</p>
+                    {% else %}
+                        <li>
+                            {{ job }}
+                            {% if current_user.is_authenticated %}
+                            <!-- Delete button for authenticated users -->
+                            <form action="/delete" method="post" style="display: none;" class="delete-form">
+                                <input type="hidden" name="job_time" value="{{ job }}">
+                                <input class="delete-button" type="submit" value="X">
+                            </form>
+                            {% endif %}
+                        </li>
+                    {% endif %}
+                {% endfor %}
+                <button onclick="toggleDeleteButtons()" class="edit-button">Edit Schedule</button>
+            </ul>
+
+
+            
+            {% if current_user.is_authenticated %}
+            <!-- Add new feeding time form -->
+            <h2>Add New Feeding Time:</h2>
+            <form class="general-form" action="/add" method="post">
+                <input type="time" name="feeding_time" required>
+                <input class="general-button" type="submit" value="Add">
+            </form>
+            
+            <!-- Manual feeding form -->
+            <h2>Manual control</h2>
+            <form action="/feed" method="post">
+                <input class="general-button" type="submit" value="Trigger a one time feeding">
+            </form>
+            {% endif %}
+            
+            <!-- Log messages -->
+            <h2>Log Messages:</h2>
+            <pre>{{ log_messages }}</pre>
+            <script src="/static/main.js"></script>
+        </div>
     </body>
 </html>

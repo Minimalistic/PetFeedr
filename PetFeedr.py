@@ -1,3 +1,4 @@
+import os
 import schedule
 import logging
 import subprocess
@@ -8,6 +9,13 @@ from SecretKeys import PETFEEDR_USER_ID,            \
                         PETFEEDR_PASSWORD,      \
                         PUSHOVER_API_TOKEN,      \
                         PUSHOVER_USER_KEY         
+
+def delete_log_file(file_path):
+    if os.path.isfile(file_path):
+        os.remove(file_path)
+
+# Call the function at the start of your script
+delete_log_file('feeding_log.txt')
 
 # Configure logging
 logging.basicConfig(filename='feeding_log.txt', level=logging.INFO,
@@ -37,7 +45,7 @@ def feed_pet(is_scheduled=False):
         logging.info("Triggering Servo to feed the pet")
         logging.info(" > ^ <")
         logging.info("( o.o ) Food dispensed successfully!")
-        logging.info(" /\_/\ ")
+        logging.info(" /\_/\💕")
         send_pushover_notification()
     except Exception as e:
         logging.error(f"Error feeding pet: {str(e)}")
