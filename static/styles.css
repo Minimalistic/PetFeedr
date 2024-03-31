@@ -115,3 +115,11 @@ h2,h3,h4,h5,h6,p {
     list-style-type: none;
     padding: 0.5em;
 }
+
+.log-messages {
+    max-height: 20em;
+    font-size: .85em;
+    border: 1px solid darkcyan;
+    border-radius: .5em;
+    box-shadow: inset 0 5px 10px #00000081;
+}

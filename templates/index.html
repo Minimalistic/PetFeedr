@@ -41,13 +41,11 @@
                 <button onclick="toggleDeleteButtons()" class="edit-button">Edit Schedule</button>
             </ul>
 
-
-            
             {% if current_user.is_authenticated %}
             <!-- Add new feeding time form -->
             <h2>Add New Feeding Time:</h2>
             <form class="general-form" action="/add" method="post">
-                <input type="time" name="feeding_time" required>
+                <input class="text-field" type="time" name="feeding_time" required>
                 <input class="general-button" type="submit" value="Add">
             </form>
             
@@ -57,10 +55,9 @@
                 <input class="general-button" type="submit" value="Trigger a one time feeding">
             </form>
             {% endif %}
-            
             <!-- Log messages -->
             <h2>Log Messages:</h2>
-            <pre>{{ log_messages }}</pre>
+            <pre class="log-messages">{{ log_messages }}</pre>
             <script src="/static/main.js"></script>
         </div>
     </body>
