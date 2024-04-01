@@ -27,8 +27,6 @@ class User(UserMixin):
     def __init__(self, id):
         self.id = id
 
-from datetime import datetime
-
 # Function to read and format feeding times from a file
 def read_and_format_times(filename):
     with open(filename, 'r') as file:

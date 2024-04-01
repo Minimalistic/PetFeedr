@@ -51,10 +51,6 @@ def feed_pet(is_scheduled=False):
     except Exception as e:
         logging.error(f"Error feeding pet: {str(e)}")
 
-def setup_schedule():
-    # Currently no pre-populated schedules, keeping around as I believe it's used by the web interface
-    pass
-
 def run():
     # Load feeding times from file
     # TODO has no validation for duplicates
@@ -91,6 +87,6 @@ def main():
     send_pushover_msg(title="Petfeedr has started!", \
                                 message="Petfeedr started successfully!")
     run() # Run PetFeedr
-    
+
 if __name__ == "__main__":
     main()
