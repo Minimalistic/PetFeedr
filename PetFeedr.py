@@ -23,12 +23,12 @@ logging.basicConfig(filename='feeding_log.txt', level=logging.INFO,
 
 def send_pushover_notification():
     # Send push notification using Pushover API
-    url = "https://api.pushover.net/1/messages.json"
-    data = {
-        "token": PUSHOVER_API_TOKEN,
-        "user": PUSHOVER_USER_KEY,
-        "title": "PetFeedr Alert",
-        "message": "PetFeedr dispensed food to your pet!"
+    url     = "https://api.pushover.net/1/messages.json"
+    data    = {
+        "token"     : PUSHOVER_API_TOKEN,
+        "user"      : PUSHOVER_USER_KEY,
+        "title"     : "PetFeedr Alert",
+        "message"   : "PetFeedr dispensed food to your pet!"
     }
     
     response = requests.post(url, data=data)
@@ -58,6 +58,10 @@ def run():
     # Load feeding times from file
     # TODO has no validation for duplicates
     try:
+        if not os.path.isfile('feeding_schedules.txt'):
+            open('feeding_schedules.txt', 'w').close()
+            logging.info("feeding_schedules.txt not found. An empty file has been created.")
+        
         with open('feeding_schedules.txt', 'r') as file:
             lines = file.readlines()
             if len(lines) == 0:
@@ -67,8 +71,6 @@ def run():
                     hour, minute = line.strip().split(':')
                     schedule.every().day.at(f"{hour}:{minute}").do(feed_pet)
                     logging.info(f"Event found in schedules file! - Added: {hour}:{minute}")  # Log the loaded feeding time
-    except FileNotFoundError:
-        logging.warning("feeding_schedules.txt not found. Starting with an empty schedule.")
     except Exception as e:
         logging.error(f"Error reading feeding_schedules.txt: {str(e)}")
 
