@@ -25,10 +25,10 @@ def send_pushover_msg(title, message):
     # Send push notification using Pushover API
     url = "https://api.pushover.net/1/messages.json"
     data = {
-        "token": PUSHOVER_API_TOKEN,
-        "user": PUSHOVER_USER_KEY,
-        "title": title,
-        "message": message
+        "token"     : PUSHOVER_API_TOKEN,
+        "user"      : PUSHOVER_USER_KEY,
+        "title"     : title,
+        "message"   : message
     }
     
     response = requests.post(url, data=data)
@@ -47,7 +47,7 @@ def feed_pet(is_scheduled=False):
         logging.info("( o.o ) Food dispensed successfully!")
         logging.info(" /\_/\💕")
         send_pushover_msg(title="Petfeedr fed your pet!", \
-                                    message="Petfeedr fed your pet!")
+                                    message="Petfeedr fed your pet!x")
     except Exception as e:
         logging.error(f"Error feeding pet: {str(e)}")
 

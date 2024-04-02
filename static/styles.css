@@ -15,6 +15,10 @@ body {
     font-style: italic;
 }
 
+.hopper-container {
+
+}
+
 /* styles the Login / Logout button */
 #session-button {
     position: absolute;
@@ -23,7 +27,7 @@ body {
 }
 
 /* Styling the feeding times and log window */
-pre { 
+.log-messages { 
     background-color: white;
     padding: 10px;
     border-radius: 5px;
@@ -82,7 +86,6 @@ h2,h3,h4,h5,h6,p {
     background-color: darkcyan;
     color: white;
     border: none;
-    border-radius: 4px;
     cursor: pointer;
     transition: background-color 0.3s ease;
 }

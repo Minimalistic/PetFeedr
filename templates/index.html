@@ -18,7 +18,7 @@
             {% else %}
                 <a href="{{ url_for('login') }}" id="session-button">Login</a>
             {% endif %}
-            
+
             <!-- Scheduled feeding times -->
             <h2>Scheduled Feeding Times:</h2>
             <ul class="text-panel">
@@ -40,6 +40,30 @@
                 {% endfor %}
                 <button onclick="toggleDeleteButtons()" class="edit-button">Edit Schedule</button>
             </ul>
+            <div class="hopper-container">
+                <pre>
+                    _____________
+                    |◍◍◍◍◍◍◍◍◍◍◍|
+                    |◍◍◍◍◍◍◍◍◍◍◍|
+                    |◍◍◍◍◍◍◍◍◍◍◍|
+                    |\◍◍◍◍◍◍◍◍◍/|
+                    | \◍◍◍◍◍◍◍/ |
+                    |  \◍◍◍◍◍/  |
+                    |   \◍◍◍/   |
+                    |    \◍/    |
+                    |   [ @ ]   |
+                    |    | |    |
+                    ||___| |___||
+                    |\         /|
+                    | \       / |
+                    |  \     /  |
+                    |   \   /   |
+                    |    \ /    |
+                    |    | |    |
+                    |____| |____| 
+                    \___________/  
+                </pre>
+            </div>
 
             {% if current_user.is_authenticated %}
             <!-- Add new feeding time form -->
