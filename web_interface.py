@@ -1,15 +1,13 @@
-from flask import Flask, redirect, url_for, request, render_template
-from flask_login import LoginManager, UserMixin, current_user, login_required, login_user, logout_user
-import schedule
+#!/home/petfeedr/GithubRepos/PetFeedr/venv/bin/python3
 import time
 import logging
 from threading import Thread
 from PetFeedr import get_hopper_ascii, validate_login, feed_pet
 from SecretKeys import PETFEEDR_SECRET_KEY
 from datetime import datetime
-
-#!/usr/bin/env python3
-
+from flask import Flask, redirect, url_for, request, render_template
+from flask_login import LoginManager, UserMixin, current_user, login_required, login_user, logout_user
+import schedule
 
 app = Flask(__name__)
 app.secret_key = PETFEEDR_SECRET_KEY
