@@ -1,4 +1,4 @@
-#!/home/petfeedr/GithubRepos/PetFeedr/venv/bin/python3
+#!/home/petfeedr/GithubRepos/PetFeedr/venv/bin/python
 import time
 import logging
 from threading import Thread
