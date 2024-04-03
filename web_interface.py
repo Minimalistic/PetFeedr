@@ -4,7 +4,7 @@ import schedule
 import time
 import logging
 from threading import Thread
-from PetFeedr import validate_login, feed_pet
+from PetFeedr import get_hopper_ascii, validate_login, feed_pet
 from SecretKeys import PETFEEDR_SECRET_KEY
 from datetime import datetime
 
@@ -78,11 +78,12 @@ def unauthorized(e):
 def index():
     # Read and format the scheduled jobs from feeding_schedules.txt
     scheduled_jobs = read_and_format_times('feeding_schedules.txt')
-
+    hopper_level = 100  # Placeholder for the hopper level until more refined.
+    hopper_ascii = get_hopper_ascii(hopper_level)
     with open('feeding_log.txt', 'r') as file:
         log_messages = file.readlines()
     log_messages.reverse()
-    return render_template('index.html', current_user=current_user, scheduled_jobs=scheduled_jobs, log_messages=''.join(log_messages))
+    return render_template('index.html', hopper_ascii=hopper_ascii, current_user=current_user, scheduled_jobs=scheduled_jobs, log_messages=''.join(log_messages))
 
 # Route for the login page
 @app.route('/login', methods=['GET', 'POST'])

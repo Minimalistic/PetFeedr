@@ -40,31 +40,9 @@
                 {% endfor %}
                 <button onclick="toggleDeleteButtons()" class="edit-button">Edit Schedule</button>
             </ul>
-            <div class="hopper-container">
-                <pre>
-                    _____________
-                    |◍◍◍◍◍◍◍◍◍◍◍|
-                    |◍◍◍◍◍◍◍◍◍◍◍|
-                    |◍◍◍◍◍◍◍◍◍◍◍|
-                    |\◍◍◍◍◍◍◍◍◍/|
-                    | \◍◍◍◍◍◍◍/ |
-                    |  \◍◍◍◍◍/  |
-                    |   \◍◍◍/   |
-                    |    \◍/    |
-                    |   [ @ ]   |
-                    |    | |    |
-                    ||___| |___||
-                    |\         /|
-                    | \       / |
-                    |  \     /  |
-                    |   \   /   |
-                    |    \ /    |
-                    |    | |    |
-                    |____| |____| 
-                    \___________/  
-                </pre>
+            <div class=""hopper-container">
+                <pre>{{ hopper_ascii }}</pre>
             </div>
-
             {% if current_user.is_authenticated %}
             <!-- Add new feeding time form -->
             <h2>Add New Feeding Time:</h2>

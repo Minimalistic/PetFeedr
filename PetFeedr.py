@@ -38,6 +38,55 @@ def send_pushover_msg(title, message):
     else:
         logging.info("Pushover failed to send notification.")
 
+def get_hopper_ascii(level):
+    if level == 100:
+        return """
+            _____________
+            |◍◍◍◍◍◍◍◍◍◍◍|
+            |◍◍◍◍◍◍◍◍◍◍◍|
+            |◍◍◍◍◍◍◍◍◍◍◍|
+            |\◍◍◍◍◍◍◍◍◍/|
+            | \◍◍◍◍◍◍◍/ |
+            |  \◍◍◍◍◍/  |
+            |   \◍◍◍/   |
+            |    \◍/    |
+            |   [ @ ]   |
+            |    | |    |
+            ||___| |___||
+            |\         /|
+            | \       / |
+            |  \     /  |
+            |   \   /   |
+            |    \ /    |
+            |    | |    |
+            |____| |____| 
+            \___________/  
+        """
+    elif level == 75:
+                return """
+            _____________
+            |           |
+            |           |
+            |◍ ◍ ◍ ◍ ◍ ◍|
+            |\◍◍◍◍◍◍◍◍◍/|
+            | \◍◍◍◍◍◍◍/ |
+            |  \◍◍◍◍◍/  |
+            |   \◍◍◍/   |
+            |    \◍/    |
+            |   [ @ ]   |
+            |    | |    |
+            ||___| |___||
+            |\         /|
+            | \       / |
+            |  \     /  |
+            |   \   /   |
+            |    \ /    |
+            |    | |    |
+            |____| |____| 
+            \___________/  
+        """
+    # Add more conditions for other levels
+
 def feed_pet(is_scheduled=False):
     try:
         # Dispense food to the pet using the servo
