@@ -21,6 +21,21 @@ body {
     align-items: center;
     padding-bottom: 1em;
 }
+.hopper-container pre {
+    font-size: 2vw;
+}
+
+@media screen and (min-width: 1200px) {
+    .hopper-container pre {
+        font-size: 24px; /* maximum font size on large screens */
+    }
+}
+
+@media screen and (max-width: 600px) {
+    .hopper-container pre {
+        font-size: 14px; /* minimum font size on small screens */
+    }
+}
 
 .hopper-container, .schedule-container {
     width: 40%; /* adjust as needed */
@@ -28,7 +43,6 @@ body {
 
 .hopper-container {
     margin-right: 2em;
-
 }
 
 /* styles the Login / Logout button */
@@ -63,7 +77,6 @@ h2,h3,h4,h5,h6,p {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-
 }
 
 .general-button {
@@ -86,11 +99,17 @@ h2,h3,h4,h5,h6,p {
     background-color: lightcoral;
 }
 
+.add-button {
+    width:100%;
+    max-width:50%;
+}
+
 .edit-button {
     margin-left: auto;
     margin-right: auto;
     display: inline-block;
     padding: 0.8em 1.5em;
+    width:100%;
     font-size: 1em;
     font-weight: bold;
     text-align: center;
@@ -113,7 +132,7 @@ h2,h3,h4,h5,h6,p {
     transition: background-color 0.3s ease;
 }
 
-.text-panel {
+.schedule-container {
     margin:0;
     margin-top:1em;
     margin-left: auto;
@@ -121,12 +140,13 @@ h2,h3,h4,h5,h6,p {
     padding:0;
     background-color:white;
     text-align: center;
-    max-width: 9em;
+    min-width: 9em;
+    width:35%;
     border: 5px solid darkcyan;
     border-radius: .5em;
 }
 
-.text-panel li {
+.schedule-container li {
     list-style-type: none;
     padding: 0.5em;
 }

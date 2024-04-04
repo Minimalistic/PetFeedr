@@ -19,8 +19,11 @@
                 <a href="{{ url_for('login') }}" id="session-button">Login</a>
             {% endif %}
             <div class="content-container">
-
-                <ul class="text-panel">
+            </ul>
+            <div class="hopper-container">
+                <pre>{{ hopper_ascii }}</pre>
+            </div>
+                <ul class="schedule-container">
                     {% for job in scheduled_jobs %}
                         {% if job == '-separator-' %}
                             <p>------AM/PM------</p>
@@ -40,17 +43,14 @@
                     {% if current_user.is_authenticated %}
                         <button onclick="toggleDeleteButtons()" class="edit-button">Edit Schedule</button>
                     {% endif %}
-                    </ul>
-                <div class="hopper-container">
-                    <pre>{{ hopper_ascii }}</pre>
-                </div>
+
             </div>
             {% if current_user.is_authenticated %}
             <!-- Add new feeding time form -->
             <h2>Add New Feeding Time:</h2>
             <form class="general-form" action="/add" method="post">
                 <input class="text-field" type="time" name="feeding_time" required>
-                <input class="general-button" type="submit" value="Add">
+                <input class="general-button add-button" type="submit" value="Add">
             </form>
             
             <!-- Manual feeding form -->
