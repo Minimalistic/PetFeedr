@@ -2,4 +2,5 @@ feeding_log.txt
 feeding_schedules.txt
 SecretKey.py
 SecretKeys.py
+venv/
 __pycache__/
