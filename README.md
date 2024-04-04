@@ -12,7 +12,10 @@ PetFeedr is a project that aims to automate the feeding process for pets. It pro
 ## Installation
 
 1. Clone the repository: `git clone https://github.com/your-username/PetFeedr.git`
-2. ???
+2. Navigate to repository folder in terminal
+3. Type `python3 -m venv venv`
+4. Type `source venv/bin/activate`
+5. Type `pip install -r requirements.txt`
 
 ## Usage
 

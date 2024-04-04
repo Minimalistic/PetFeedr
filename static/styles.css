@@ -15,7 +15,19 @@ body {
     font-style: italic;
 }
 
+.content-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 1em;
+}
+
+.hopper-container, .schedule-container {
+    width: 40%; /* adjust as needed */
+}
+
 .hopper-container {
+    margin-right: 2em;
 
 }
 

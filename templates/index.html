@@ -18,30 +18,32 @@
             {% else %}
                 <a href="{{ url_for('login') }}" id="session-button">Login</a>
             {% endif %}
+            <div class="content-container">
 
-            <!-- Scheduled feeding times -->
-            <h2>Scheduled Feeding Times:</h2>
-            <ul class="text-panel">
-                {% for job in scheduled_jobs %}
-                    {% if job == '-separator-' %}
-                        <p>------AM/PM------</p>
-                    {% else %}
-                        <li>
-                            {{ job }}
-                            {% if current_user.is_authenticated %}
-                            <!-- Delete button for authenticated users -->
-                            <form action="/delete" method="post" style="display: none;" class="delete-form">
-                                <input type="hidden" name="job_time" value="{{ job }}">
-                                <input class="delete-button" type="submit" value="X">
-                            </form>
-                            {% endif %}
-                        </li>
+                <ul class="text-panel">
+                    {% for job in scheduled_jobs %}
+                        {% if job == '-separator-' %}
+                            <p>------AM/PM------</p>
+                        {% else %}
+                            <li>
+                                {{ job }}
+                                {% if current_user.is_authenticated %}
+                                <!-- Delete button for authenticated users -->
+                                <form action="/delete" method="post" style="display: none;" class="delete-form">
+                                    <input type="hidden" name="job_time" value="{{ job }}">
+                                    <input class="delete-button" type="submit" value="X">
+                                </form>
+                                {% endif %}
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+                    {% if current_user.is_authenticated %}
+                        <button onclick="toggleDeleteButtons()" class="edit-button">Edit Schedule</button>
                     {% endif %}
-                {% endfor %}
-                <button onclick="toggleDeleteButtons()" class="edit-button">Edit Schedule</button>
-            </ul>
-            <div class=""hopper-container">
-                <pre>{{ hopper_ascii }}</pre>
+                    </ul>
+                <div class="hopper-container">
+                    <pre>{{ hopper_ascii }}</pre>
+                </div>
             </div>
             {% if current_user.is_authenticated %}
             <!-- Add new feeding time form -->
