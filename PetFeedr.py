@@ -17,7 +17,7 @@ def delete_log_file(file_path):
         os.remove(file_path)
 
 # Call the function at the start of your script
-delete_log_file('feeding_log.txt')
+# delete_log_file('feeding_log.txt') # Commenting out for debugging purposes
 
 # Configure logging
 logging.basicConfig(filename='feeding_log.txt', level=logging.INFO,
@@ -104,6 +104,7 @@ def feed_pet(is_scheduled=False):
 
 def run():
     # Load feeding times from file
+    logging.info("Starting to load feeding times from file.")
     # TODO has no validation for duplicates
     try:
         if not os.path.isfile('feeding_schedules.txt'):
@@ -119,9 +120,11 @@ def run():
                     hour, minute = line.strip().split(':')
                     schedule.every().day.at(f"{hour}:{minute}").do(feed_pet)
                     logging.info(f"Event found in schedules file! - Added: {hour}:{minute}")  # Log the loaded feeding time
+        logging.info("Finished loading feeding times from file.")
     except Exception as e:
         logging.error(f"Error reading feeding_schedules.txt: {str(e)}")
 
+    logging.info("Starting schedule execution.")
     while True:
         schedule.run_pending()
 
