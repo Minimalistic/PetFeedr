@@ -3,6 +3,7 @@
 import os
 import schedule
 import logging
+from logging.handlers import TimedRotatingFileHandler
 import subprocess
 import requests
 from servo_controller import trigger_servo
@@ -12,16 +13,15 @@ from SecretKeys import PETFEEDR_USER_ID,            \
                         PUSHOVER_API_TOKEN,      \
                         PUSHOVER_USER_KEY         
 
-def delete_log_file(file_path):
-    if os.path.isfile(file_path):
-        os.remove(file_path)
-
-# Call the function at the start of your script
-# delete_log_file('feeding_log.txt') # Commenting out for debugging purposes
 
 # Configure logging
-logging.basicConfig(filename='feeding_log.txt', level=logging.INFO,
-                    format='%(asctime)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+log_file = 'feeding_log.txt'
+handler = TimedRotatingFileHandler(log_file, when='D', backupCount=14)
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+handler.setFormatter(formatter)
+logging.getLogger('').addHandler(handler)
+logging.getLogger('').setLevel(logging.INFO) # Logging options (DEBUG=Verbose): 
+                                             # DEBUG, INFO, WARNING, ERROR, CRITICAL
 
 def send_pushover_msg(title, message):
     # Send push notification using Pushover API
