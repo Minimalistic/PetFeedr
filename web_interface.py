@@ -1,8 +1,4 @@
 #!/usr/bin/env python3
-#Debug
-print("web_interface.py")
-import sys
-print(sys.executable)
 
 import time
 import logging

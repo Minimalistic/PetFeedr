@@ -1,8 +1,4 @@
 #!/usr/bin/env python3
-#Debug
-print("PetFeedr.py")
-import sys
-print(sys.executable)
 
 import os
 import schedule
