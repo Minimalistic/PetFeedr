@@ -3,4 +3,5 @@ feeding_schedules.txt
 SecretKey.py
 SecretKeys.py
 venv/
+*.pyc
 __pycache__/

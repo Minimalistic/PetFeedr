@@ -13,7 +13,6 @@ from SecretKeys import PETFEEDR_USER_ID,            \
                         PUSHOVER_API_TOKEN,      \
                         PUSHOVER_USER_KEY         
 
-
 # Configure logging
 log_file = 'feeding_log.txt'
 handler = TimedRotatingFileHandler(log_file, when='D', backupCount=14)
@@ -98,7 +97,7 @@ def feed_pet(is_scheduled=False):
         logging.info("( o.o ) Food dispensed successfully!")
         logging.info(" /\_/\💕")
         send_pushover_msg(title="Petfeedr fed your pet!", \
-                                    message="Petfeedr fed your pet!x")
+                                    message="Petfeedr fed your pet!")
     except Exception as e:
         logging.error(f"Error feeding pet: {str(e)}")
 
