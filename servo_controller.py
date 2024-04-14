@@ -11,12 +11,12 @@ def trigger_servo():
         Motor1.SetMicroStep('softward','fullstep')
 
         # Rotate 360 degrees forward
-        Motor1.TurnStep(Dir='forward', steps=75, stepdelay = 0.005)
+        Motor1.TurnStep(Dir='forward', steps=150, stepdelay = 0.005)
         time.sleep(0.1)
 
         # Rotate 360 degrees backward
-        Motor1.TurnStep(Dir='backward', steps=75, stepdelay = 0.005)
-        Motor1.Stop()
+        #Motor1.TurnStep(Dir='backward', steps=75, stepdelay = 0.005)
+        #Motor1.Stop()
 
     except:
         # GPIO.cleanup()
