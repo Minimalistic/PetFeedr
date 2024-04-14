@@ -88,16 +88,17 @@ def get_hopper_ascii(level):
         """
     # Add more conditions for other levels
 
-def feed_pet(is_scheduled=False):
+def feed_pet(num_feedings=1, is_scheduled=False):
     try:
         # Dispense food to the pet using the servo
-        trigger_servo()
-        logging.info("Triggering Servo to feed the pet")
+        for _ in range(num_feedings):
+            trigger_servo()
+        logging.info(f"Triggering Servo {num_feedings} times to feed the pet")
         logging.info(" > ^ <")
         logging.info("( o.o ) Food dispensed successfully!")
         logging.info(" /\_/\💕")
         send_pushover_msg(title="Petfeedr fed your pet!", \
-                                    message="Petfeedr fed your pet!")
+                                    message=f"Petfeedr fed your pet {num_feedings} times!")
     except Exception as e:
         logging.error(f"Error feeding pet: {str(e)}")
 
@@ -116,9 +117,9 @@ def run():
                 logging.warning("feeding_schedules.txt is empty. Starting with an empty schedule.")
             else:
                 for line in lines:
-                    hour, minute = line.strip().split(':')
-                    schedule.every().day.at(f"{hour}:{minute}").do(feed_pet)
-                    logging.info(f"Event found in schedules file! - Added: {hour}:{minute}")  # Log the loaded feeding time
+                    hour, minute, num_feedings = line.strip().split(':')
+                    schedule.every().day.at(f"{hour}:{minute}").do(feed_pet, num_feedings=int(num_feedings))
+                    logging.info(f"Event found in schedules file! - Added: {hour}:{minute} with {num_feedings} feedings")  # Log the loaded feeding time
         logging.info("Finished loading feeding times from file.")
     except Exception as e:
         logging.error(f"Error reading feeding_schedules.txt: {str(e)}")
