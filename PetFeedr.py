@@ -127,6 +127,7 @@ def run():
     logging.info("Starting schedule execution.")
     while True:
         schedule.run_pending()
+        logging.debug("Checking for pending scheduled tasks.")
 
 def run_web_interface():
     # Start the web interface using subprocess
