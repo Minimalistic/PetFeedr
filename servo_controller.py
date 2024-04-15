@@ -4,6 +4,7 @@ from DRV8825 import DRV8825
 
 def trigger_servo():
     start_time = time.time()  # record the start time
+    Motor1 = None
 
     try:
         Motor1 = DRV8825(dir_pin=13, step_pin=19, enable_pin=12, mode_pins=(16, 17, 20))
@@ -11,7 +12,7 @@ def trigger_servo():
         Motor1.SetMicroStep('softward','fullstep')
 
         # Rotate 360 degrees forward
-        Motor1.TurnStep(Dir='forward', steps=150, stepdelay = 0.005)
+        Motor1.TurnStep(Dir='forward', steps=100, stepdelay = 0.005)
         time.sleep(0.1)
 
         # Rotate 360 degrees backward
@@ -21,5 +22,9 @@ def trigger_servo():
     except:
         # GPIO.cleanup()
         print ("\nMotor stop")
-        Motor1.Stop()
+        if Motor1:
+            Motor1.Stop()
         exit()
+    finally:
+        if Motor1:
+            Motor1.Stop()
