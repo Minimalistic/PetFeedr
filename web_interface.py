@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 
+import os
 import time
 import logging
 from threading import Thread
-from PetFeedr import get_hopper_ascii, validate_login, feed_pet
-from SecretKeys import PETFEEDR_SECRET_KEY
+from PetFeedr import get_hopper_ascii, validate_login, feed_pet, PETFEEDR_SECRET_KEY
+
+# Configurable port - default 5000, override with PETFEEDR_PORT env var
+WEB_PORT = int(os.environ.get('PETFEEDR_PORT', 5000))
 from datetime import datetime
 from flask import Flask, redirect, url_for, request, render_template
 from flask_login import LoginManager, UserMixin, current_user, login_required, login_user, logout_user
@@ -28,14 +31,25 @@ class User(UserMixin):
 
 # Function to read and format feeding times from a file
 def read_and_format_times(filename):
-    with open(filename, 'r') as file:
-        times = file.readlines()
+    try:
+        with open(filename, 'r') as file:
+            times = file.readlines()
+    except FileNotFoundError:
+        return []
 
-    # Remove newline characters
-    times = [time.strip() for time in times]
+    # Remove newline characters and filter out empty lines
+    times = [time.strip() for time in times if time.strip()]
+
+    # If no valid times, return empty list
+    if not times:
+        return []
 
     # Convert to datetime objects
-    times = [datetime.strptime(time, "%H:%M") for time in times]
+    try:
+        times = [datetime.strptime(time, "%H:%M") for time in times]
+    except ValueError as e:
+        logging.error(f"Error parsing feeding times: {e}")
+        return []
 
     # Sort the feeding times by time
     times.sort()
@@ -79,10 +93,17 @@ def index():
     scheduled_jobs = read_and_format_times('feeding_schedules.txt')
     hopper_level = 100  # Placeholder for the hopper level until more refined.
     hopper_ascii = get_hopper_ascii(hopper_level)
-    with open('feeding_log.txt', 'r') as file:
-        log_messages = file.readlines()
-    log_messages.reverse()
-    return render_template('index.html', hopper_ascii=hopper_ascii, current_user=current_user, scheduled_jobs=scheduled_jobs, log_messages=''.join(log_messages))
+    
+    # Read log messages, handle missing file gracefully
+    try:
+        with open('feeding_log.txt', 'r') as file:
+            log_messages = file.readlines()
+        log_messages.reverse()
+        log_messages = ''.join(log_messages)
+    except FileNotFoundError:
+        log_messages = "No log messages yet."
+    
+    return render_template('index.html', hopper_ascii=hopper_ascii, current_user=current_user, scheduled_jobs=scheduled_jobs, log_messages=log_messages)
 
 # Route for the login page
 @app.route('/login', methods=['GET', 'POST'])
@@ -179,7 +200,8 @@ def trigger_feeding():
 def main():
     schedule_thread = Thread(target=run_schedule)
     schedule_thread.start()
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    logging.info(f"Starting web interface on port {WEB_PORT}")
+    app.run(host='0.0.0.0', port=WEB_PORT, debug=True)
 
 if __name__ == '__main__':
     main()

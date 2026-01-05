@@ -4,7 +4,6 @@
         <title>PetFeedr</title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles.css') }}">
-        <script src="main.js"></script>
     </head>
     <body>
         <div class="app-window">
@@ -19,31 +18,36 @@
                 <a href="{{ url_for('login') }}" id="session-button">Login</a>
             {% endif %}
             <div class="content-container">
-            </ul>
-            <div class="hopper-container">
-                <pre>{{ hopper_ascii }}</pre>
-            </div>
+                <div class="hopper-container">
+                    <pre>{{ hopper_ascii }}</pre>
+                </div>
                 <ul class="schedule-container">
-                    {% for job in scheduled_jobs %}
-                        {% if job == '-separator-' %}
-                            <p>------AM/PM------</p>
-                        {% else %}
-                            <li>
-                                {{ job }}
-                                {% if current_user.is_authenticated %}
-                                <!-- Delete button for authenticated users -->
-                                <form action="/delete" method="post" style="display: none;" class="delete-form">
-                                    <input type="hidden" name="job_time" value="{{ job }}">
-                                    <input class="delete-button" type="submit" value="X">
-                                </form>
-                                {% endif %}
-                            </li>
-                        {% endif %}
-                    {% endfor %}
-                    {% if current_user.is_authenticated %}
-                        <button onclick="toggleDeleteButtons()" class="edit-button">Edit Schedule</button>
+                    {% if scheduled_jobs %}
+                        {% for job in scheduled_jobs %}
+                            {% if job == '-separator-' %}
+                                <li><p>------AM/PM------</p></li>
+                            {% else %}
+                                <li>
+                                    {{ job }}
+                                    {% if current_user.is_authenticated %}
+                                    <!-- Delete button for authenticated users -->
+                                    <form action="/delete" method="post" style="display: none;" class="delete-form">
+                                        <input type="hidden" name="job_time" value="{{ job }}">
+                                        <input class="delete-button" type="submit" value="X">
+                                    </form>
+                                    {% endif %}
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+                    {% else %}
+                        <li>No scheduled feedings</li>
                     {% endif %}
-
+                    {% if current_user.is_authenticated %}
+                        <li>
+                            <button onclick="toggleDeleteButtons()" class="edit-button">Edit Schedule</button>
+                        </li>
+                    {% endif %}
+                </ul>
             </div>
             {% if current_user.is_authenticated %}
             <!-- Add new feeding time form -->

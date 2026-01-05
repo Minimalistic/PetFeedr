@@ -15,7 +15,9 @@ PetFeedr is a project that aims to automate the feeding process for pets. It pro
 2. Navigate to repository folder in terminal
 3. Type `python3 -m venv venv`
 4. Type `source venv/bin/activate`
-5. Type `pip install -r requirements.txt`
+5. Install dependencies:
+   - **On Raspberry Pi:** `pip install -r requirements-pi.txt`
+   - **On Mac/PC (development):** `pip install -r requirements.txt`
 
 
 ## Configuring the Service
@@ -54,6 +56,36 @@ Replace `<your-user>` with your Raspberry Pi username and `/path/to/PetFeedr` wi
 2. Create an account or log in with your existing credentials
 3. Set up feeding schedules and portion sizes for your pets
 4. Monitor feeding events and adjust settings as needed
+
+## Development / Simulation Mode
+
+PetFeedr can run in simulation mode for development and testing without needing actual hardware. This is useful for:
+- Developing on a laptop/desktop without GPIO access
+- Testing schedule changes without affecting the live pet feeder
+- Debugging the web interface
+
+### Running in Simulation Mode
+
+**Automatic:** If `RPi.GPIO` is not installed (e.g., on a Mac or PC), simulation mode is enabled automatically.
+
+**Manual:** Force simulation mode by setting an environment variable:
+```bash
+PETFEEDR_SIMULATE=true python3 PetFeedr.py
+```
+
+In simulation mode:
+- 🔧 No GPIO/hardware is touched
+- 🔄 Motor movements are logged but not executed
+- 📱 Pushover notifications are simulated (logged, not sent)
+- ✅ The web interface works normally
+
+### Configuration
+
+Copy `SecretKeys.py.example` to `SecretKeys.py` and configure:
+- `PETFEEDR_USER_ID` / `PETFEEDR_PASSWORD` - Web login credentials
+- `PETFEEDR_SECRET_KEY` - Flask session secret (generate a random string)
+- `PUSHOVER_ENABLED` - Set to `True` to enable push notifications
+- `PUSHOVER_API_TOKEN` / `PUSHOVER_USER_KEY` - From pushover.net (optional)
 
 ## Maintaining the Raspberry Pi
 

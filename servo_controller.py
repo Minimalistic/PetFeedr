@@ -1,22 +1,26 @@
-import RPi.GPIO as GPIO
 import time
-from DRV8825 import DRV8825
+import logging
+from DRV8825 import DRV8825, SIMULATION_MODE
+
 
 def trigger_servo():
-    start_time = time.time() # record the start time
+    """Trigger the motor to dispense food."""
+    start_time = time.time()
     Motor1 = None
 
     try:
         Motor1 = DRV8825(dir_pin=13, step_pin=19, enable_pin=12, mode_pins=(16, 17, 20))
-        Motor1.SetMicroStep('softward','fullstep')
+        Motor1.SetMicroStep('softward', 'fullstep')
 
-        # Rotate 360 degrees forward
-        Motor1.TurnStep(Dir='forward', steps=100, stepdelay = 0.005)
+        # Rotate forward to dispense food
+        Motor1.TurnStep(Dir='forward', steps=100, stepdelay=0.005)
         time.sleep(0.1)
 
-        # Rotate 360 degrees backward
-        #Motor1.TurnStep(Dir='backward', steps=75, stepdelay = 0.005)
-        #Motor1.Stop()
+        elapsed = time.time() - start_time
+        if SIMULATION_MODE:
+            logging.info(f"[SIM] ✅ Feeding cycle completed in {elapsed:.2f}s")
+        else:
+            logging.info(f"Feeding cycle completed in {elapsed:.2f}s")
 
     except Exception as e:
         logging.exception("An error occurred while triggering the servo:")
@@ -24,13 +28,9 @@ def trigger_servo():
         if Motor1:
             Motor1.Stop()
             logging.info("Motor stopped due to an exception")
-        
-        # You can add additional error handling or recovery logic here
-        # For example, you could retry triggering the servo after a certain delay
-        # or perform any necessary cleanup tasks
 
     finally:
         # Ensure the motor is stopped and cleaned up properly
         if Motor1:
             Motor1.Stop()
-            logging.info("Motor stopped and cleaned up")
+            logging.debug("Motor stopped and cleaned up")
