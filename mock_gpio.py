@@ -61,3 +61,4 @@ def cleanup(pin=None):
     else:
         logging.debug("[SIM] GPIO.cleanup()")
 
+

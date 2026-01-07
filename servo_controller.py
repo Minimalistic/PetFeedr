@@ -10,10 +10,21 @@ def trigger_servo():
 
     try:
         Motor1 = DRV8825(dir_pin=13, step_pin=19, enable_pin=12, mode_pins=(16, 17, 20))
-        Motor1.SetMicroStep('softward', 'fullstep')
+        
+        # Use 1/16 microstepping for quieter operation and better torque management
+        # 'softward' means we control the microstep pins via software
+        Motor1.SetMicroStep('softward', '1/16step')
 
-        # Rotate forward to dispense food
-        Motor1.TurnStep(Dir='forward', steps=100, stepdelay=0.005)
+        # Agitation Sequence:
+        # 1. Rotate backward slightly to dislodge any potential jams
+        logging.info("Starting agitation sequence (backward)")
+        Motor1.TurnStep(Dir='backward', steps=160, stepdelay=0.0005) # ~10% of a rotation
+        time.sleep(0.1)
+
+        # 2. Rotate forward to dispense food
+        #    Full dispense (1600) + recovering the backward agitataion (160) = 1760 steps
+        logging.info("Dispensing food (forward)")
+        Motor1.TurnStep(Dir='forward', steps=1760, stepdelay=0.0005)
         time.sleep(0.1)
 
         elapsed = time.time() - start_time
