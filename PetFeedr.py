@@ -1,38 +1,16 @@
 #!/usr/bin/env python3
 
 import os
+import random
+import json
 import schedule
 import logging
 from logging.handlers import TimedRotatingFileHandler
 import subprocess
-import requests
-from servo_controller import trigger_servo
+from datetime import datetime, timedelta, date
+import time
+from servo_controller import trigger_servo, PORTION_SIZES, DEFAULT_PORTION
 from DRV8825 import SIMULATION_MODE
-
-# Import secrets - handle missing keys gracefully for optional features
-try:
-    from SecretKeys import PETFEEDR_USER_ID, PETFEEDR_PASSWORD
-except ImportError:
-    PETFEEDR_USER_ID = "admin"
-    PETFEEDR_PASSWORD = "admin"
-    logging.warning("SecretKeys.py not found - using default credentials")
-
-try:
-    from SecretKeys import PETFEEDR_SECRET_KEY
-except ImportError:
-    PETFEEDR_SECRET_KEY = "dev-secret-key-change-me"
-
-# Pushover is optional - check if configured
-try:
-    from SecretKeys import PUSHOVER_API_TOKEN, PUSHOVER_USER_KEY, PUSHOVER_ENABLED
-except ImportError:
-    PUSHOVER_API_TOKEN = None
-    PUSHOVER_USER_KEY = None
-    PUSHOVER_ENABLED = False
-
-# Allow environment variable to override Pushover setting
-if os.environ.get('PUSHOVER_ENABLED', '').lower() == 'false':
-    PUSHOVER_ENABLED = False
 
 # Configure logging
 log_file = 'feeding_log.txt'
@@ -47,35 +25,8 @@ console_handler = logging.StreamHandler()
 console_handler.setFormatter(formatter)
 logging.getLogger('').addHandler(console_handler)
 
-
-def send_pushover_msg(title, message):
-    """Send push notification using Pushover API (if enabled)."""
-    # Skip if Pushover is not configured or disabled
-    if not PUSHOVER_ENABLED or not PUSHOVER_API_TOKEN or not PUSHOVER_USER_KEY:
-        logging.debug(f"Pushover disabled - would send: {title}")
-        return
-    
-    # Skip in simulation mode to avoid spamming during development
-    if SIMULATION_MODE:
-        logging.info(f"[SIM] 📱 Would send Pushover: {title} - {message}")
-        return
-    
-    url = "https://api.pushover.net/1/messages.json"
-    data = {
-        "token": PUSHOVER_API_TOKEN,
-        "user": PUSHOVER_USER_KEY,
-        "title": title,
-        "message": message
-    }
-    
-    try:
-        response = requests.post(url, data=data)
-        if response.status_code == 200:
-            logging.info("Pushover notification sent successfully.")
-        else:
-            logging.warning(f"Pushover failed: {response.status_code}")
-    except Exception as e:
-        logging.error(f"Pushover error: {e}")
+# File to store today's randomized schedule (for web UI display)
+TODAYS_SCHEDULE_FILE = 'todays_schedule.json'
 
 
 def get_hopper_ascii(level):
@@ -125,74 +76,213 @@ def get_hopper_ascii(level):
             |____| |____| 
             \___________/  
         """
-    # Add more conditions for other levels
     return ""
 
 
-def feed_pet(is_scheduled=False):
+def feed_pet(portion=DEFAULT_PORTION):
+    """Feed the pet with the specified portion size."""
     try:
-        # Dispense food to the pet using the servo
-        trigger_servo()
+        trigger_servo(portion=portion)
         logging.info("Triggering Servo to feed the pet")
         logging.info(" > ^ <")
         logging.info("( o.o ) Food dispensed successfully!")
         logging.info(" /\\_/\\💕")
-        send_pushover_msg(title="Petfeedr fed your pet!",
-                          message="Petfeedr fed your pet!")
     except Exception as e:
         logging.error(f"Error feeding pet: {str(e)}")
 
 
-def run():
-    # Load feeding times from file
-    logging.info("Starting to load feeding times from file.")
-    # TODO has no validation for duplicates
-    try:
-        if not os.path.isfile('feeding_schedules.txt'):
-            open('feeding_schedules.txt', 'w').close()
-            logging.info("feeding_schedules.txt not found. An empty file has been created.")
+def parse_schedule_line(line):
+    """Parse a schedule line into components.
+    
+    Format: "HH:MM,portion[,fixed]"
+    Returns: (time_str, portion, is_fixed)
+    """
+    parts = line.strip().split(',')
+    time_str = parts[0].strip()
+    
+    portion = DEFAULT_PORTION
+    is_fixed = False
+    
+    if len(parts) > 1:
+        portion = parts[1].strip()
+        if portion not in PORTION_SIZES:
+            portion = DEFAULT_PORTION
+    
+    if len(parts) > 2 and parts[2].strip().lower() == 'fixed':
+        is_fixed = True
+    
+    return time_str, portion, is_fixed
+
+
+def apply_random_offset(time_str, range_minutes, all_times):
+    """Apply a random offset to a time, avoiding conflicts with other times.
+    
+    Args:
+        time_str: Original time in "HH:MM" format
+        range_minutes: Max offset in either direction
+        all_times: List of already-scheduled times to avoid (as datetime objects)
+    
+    Returns:
+        New time string in "HH:MM" format
+    """
+    base_time = datetime.strptime(time_str, "%H:%M")
+    
+    # Try up to 10 times to find a non-conflicting time
+    for _ in range(10):
+        offset = random.randint(-range_minutes, range_minutes)
+        new_time = base_time + timedelta(minutes=offset)
         
-        with open('feeding_schedules.txt', 'r') as file:
-            lines = file.readlines()
-            if len(lines) == 0:
-                logging.warning("feeding_schedules.txt is empty. Starting with an empty schedule.")
-            else:
-                for line in lines:
-                    hour, minute = line.strip().split(':')
-                    schedule.every().day.at(f"{hour}:{minute}").do(feed_pet)
-                    logging.info(f"Event found in schedules file! - Added: {hour}:{minute}")
+        # Keep within same day (0:00 - 23:59)
+        if new_time.hour < 0 or (new_time.day != base_time.day and offset < 0):
+            new_time = base_time  # Don't go before midnight
+        
+        # Check for conflicts (within 10 minutes of another feeding)
+        conflict = False
+        for other_time in all_times:
+            diff = abs((new_time - other_time).total_seconds() / 60)
+            if diff < 10 and diff > 0:  # Within 10 minutes
+                conflict = True
+                break
+        
+        if not conflict:
+            return new_time.strftime("%H:%M")
+    
+    # If we couldn't find a good time, just use original
+    return time_str
+
+
+def load_and_schedule_feedings():
+    """Load feeding times and schedule them with randomization for non-fixed times."""
+    # Default randomization range: ±30 minutes
+    range_minutes = 30
+    
+    schedule.clear()  # Clear existing schedules
+    
+    if not os.path.isfile('feeding_schedules.txt'):
+        open('feeding_schedules.txt', 'w').close()
+        logging.info("feeding_schedules.txt not found. An empty file has been created.")
+        return []
+    
+    todays_schedule = []
+    scheduled_times = []  # Track times to avoid conflicts
+    
+    with open('feeding_schedules.txt', 'r') as file:
+        lines = file.readlines()
+    
+    if len(lines) == 0:
+        logging.warning("feeding_schedules.txt is empty. Starting with an empty schedule.")
+        return []
+    
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        
+        time_str, portion, is_fixed = parse_schedule_line(line)
+        
+        # Apply randomization if not fixed
+        if not is_fixed:
+            actual_time = apply_random_offset(time_str, range_minutes, scheduled_times)
+            logging.info(f"Randomized: {time_str} → {actual_time} ({portion} portion)")
+        else:
+            actual_time = time_str
+            logging.info(f"Fixed time: {actual_time} ({portion} portion)")
+        
+        # Track this time for conflict avoidance
+        scheduled_times.append(datetime.strptime(actual_time, "%H:%M"))
+        
+        # Schedule the feeding
+        schedule.every().day.at(actual_time).do(lambda p=portion: feed_pet(portion=p))
+        
+        # Store for today's schedule display
+        todays_schedule.append({
+            'base_time': time_str,
+            'actual_time': actual_time,
+            'portion': portion,
+            'is_fixed': is_fixed,
+            'randomized': actual_time != time_str
+        })
+    
+    # Save today's schedule for web UI
+    save_todays_schedule(todays_schedule)
+    
+    return todays_schedule
+
+
+def save_todays_schedule(schedule_data):
+    """Save today's randomized schedule for web UI display."""
+    data = {
+        'date': date.today().isoformat(),
+        'schedule': schedule_data
+    }
+    try:
+        with open(TODAYS_SCHEDULE_FILE, 'w') as f:
+            json.dump(data, f, indent=2)
+    except Exception as e:
+        logging.error(f"Error saving today's schedule: {e}")
+
+
+def load_todays_schedule():
+    """Load today's schedule. Returns None if needs regeneration."""
+    if not os.path.exists(TODAYS_SCHEDULE_FILE):
+        return None
+    
+    try:
+        with open(TODAYS_SCHEDULE_FILE, 'r') as f:
+            data = json.load(f)
+        
+        # Check if it's from today
+        if data.get('date') == date.today().isoformat():
+            return data.get('schedule', [])
+        else:
+            return None  # Needs regeneration for new day
+    except Exception as e:
+        logging.error(f"Error loading today's schedule: {e}")
+        return None
+
+
+def run():
+    """Main run loop - loads schedules and runs them."""
+    logging.info("Starting to load feeding times from file.")
+    
+    try:
+        load_and_schedule_feedings()
         logging.info("Finished loading feeding times from file.")
     except Exception as e:
         logging.error(f"Error reading feeding_schedules.txt: {str(e)}")
-
+    
     logging.info("Starting schedule execution.")
+    last_date = date.today()
+    
     while True:
+        # Check if it's a new day - regenerate randomized schedule
+        if date.today() != last_date:
+            logging.info("New day detected - regenerating schedule with fresh randomization")
+            try:
+                load_and_schedule_feedings()
+                last_date = date.today()
+            except Exception as e:
+                logging.error(f"Error regenerating schedule: {e}")
+        
         schedule.run_pending()
-        logging.debug("Checking for pending scheduled tasks.")
+        time.sleep(1)
 
 
 def run_web_interface():
-    # Start the web interface using subprocess
+    """Start the web interface using subprocess."""
     subprocess.Popen(["python3", "web_interface.py"])
 
 
-def validate_login(user_id, password):
-    # Validate user login credentials
-    return user_id == PETFEEDR_USER_ID and password == PETFEEDR_PASSWORD
-
-
 def main():
-    # Log startup mode
     if SIMULATION_MODE:
         logging.info("=" * 50)
         logging.info("🔧 PETFEEDR RUNNING IN SIMULATION MODE")
         logging.info("   No hardware will be touched!")
         logging.info("=" * 50)
     
-    run_web_interface()  # Start web server
-    send_pushover_msg(title="Petfeedr has started!",
-                      message="Petfeedr started successfully!")
-    run()  # Run PetFeedr
+    run_web_interface()
+    logging.info("PetFeedr started successfully!")
+    run()
 
 
 if __name__ == "__main__":

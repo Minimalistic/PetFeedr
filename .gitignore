@@ -1,7 +1,32 @@
-feeding_log.txt
-feeding_schedules.txt
-SecretKey.py
-SecretKeys.py
-venv/
-*.pyc
+# Python
 __pycache__/
+*.py[cod]
+*$py.class
+*.so
+venv/
+.venv/
+ENV/
+env/
+.Python
+pip-log.txt
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# PetFeedr - Runtime files (preserved on Pi)
+feeding_schedules.txt
+feeding_log.txt
+settings.json
+todays_schedule.json
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Backups (if accidentally placed in repo)
+backups/

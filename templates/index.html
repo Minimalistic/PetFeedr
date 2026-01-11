@@ -3,70 +3,194 @@
     <head>
         <title>PetFeedr</title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;500;600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
         <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles.css') }}">
     </head>
     <body>
-        <div class="app-window">
-            <!-- Page header -->
-            <h1><span class="pet">Pet</span><span class="feedr">Feedr</span></h1>
-            
-            <!-- User authentication -->
-            {% if current_user.is_authenticated %}
-                <p>Welcome, {{ current_user.id }}!</p>
-                <a href="{{ url_for('logout') }}" id="session-button">Logout</a>
-            {% else %}
-                <a href="{{ url_for('login') }}" id="session-button">Login</a>
-            {% endif %}
-            <div class="content-container">
-                <div class="hopper-container">
-                    <pre>{{ hopper_ascii }}</pre>
-                </div>
-                <ul class="schedule-container">
-                    {% if scheduled_jobs %}
-                        {% for job in scheduled_jobs %}
-                            {% if job == '-separator-' %}
-                                <li><p>------AM/PM------</p></li>
-                            {% else %}
-                                <li>
-                                    {{ job }}
-                                    {% if current_user.is_authenticated %}
-                                    <!-- Delete button for authenticated users -->
-                                    <form action="/delete" method="post" style="display: none;" class="delete-form">
-                                        <input type="hidden" name="job_time" value="{{ job }}">
-                                        <input class="delete-button" type="submit" value="X">
-                                    </form>
-                                    {% endif %}
-                                </li>
-                            {% endif %}
-                        {% endfor %}
-                    {% else %}
-                        <li>No scheduled feedings</li>
-                    {% endif %}
-                    {% if current_user.is_authenticated %}
-                        <li>
-                            <button onclick="toggleDeleteButtons()" class="edit-button">Edit Schedule</button>
-                        </li>
-                    {% endif %}
-                </ul>
+        <!-- Settings Sidebar -->
+        <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2>Settings</h2>
+                <button class="sidebar-close" onclick="toggleSidebar()">×</button>
             </div>
-            {% if current_user.is_authenticated %}
-            <!-- Add new feeding time form -->
-            <h2>Add New Feeding Time:</h2>
-            <form class="general-form" action="/add" method="post">
-                <input class="text-field" type="time" name="feeding_time" required>
-                <input class="general-button add-button" type="submit" value="Add">
-            </form>
             
-            <!-- Manual feeding form -->
-            <h2>Manual control</h2>
-            <form action="/feed" method="post">
-                <input class="general-button" type="submit" value="Trigger a one time feeding">
-            </form>
-            {% endif %}
-            <!-- Log messages -->
-            <h2>Log Messages:</h2>
-            <pre class="log-messages">{{ log_messages }}</pre>
-            <script src="/static/main.js"></script>
-        </div>
+            <div class="sidebar-content">
+                <!-- Add New Feeding -->
+                <section class="sidebar-section">
+                    <h3>Add Feeding Time</h3>
+                    <form action="/add" method="post" class="add-form">
+                        <div class="form-group">
+                            <label for="feeding_time">Time</label>
+                            <input type="time" id="feeding_time" name="feeding_time" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="portion">Portion</label>
+                            <select id="portion" name="portion">
+                                {% for name, (cycles, desc) in portion_sizes.items() %}
+                                    <option value="{{ name }}" {% if name == default_portion %}selected{% endif %}>
+                                        {{ name | capitalize }} ({{ desc }})
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" name="randomize" checked>
+                            <span class="toggle-slider"></span>
+                            <span class="toggle-label-text">Randomize time</span>
+                        </label>
+                        <p class="setting-description">Varies feeding time by ±30 min daily</p>
+                        <button type="submit" class="btn btn-primary">Add Feeding</button>
+                    </form>
+                </section>
+                
+                <!-- Edit Schedule -->
+                <section class="sidebar-section">
+                    <h3>Edit Schedule</h3>
+                    {% if schedules %}
+                        <ul class="edit-schedule-list">
+                            {% for sched in schedules %}
+                                <li class="edit-schedule-item">
+                                    <div class="edit-schedule-info">
+                                        <span class="edit-time">{{ sched.actual_time_12h }}</span>
+                                        <span class="edit-portion portion-{{ sched.portion }}">{{ sched.portion }}</span>
+                                        {% if sched.is_fixed %}<span class="fixed-icon">🔒</span>{% endif %}
+                                    </div>
+                                    <div class="edit-schedule-actions">
+                                        <form action="/update_portion" method="post" class="inline-form" 
+                                              onsubmit="return confirmChange('Change portion size for {{ sched.actual_time_12h }}?')">
+                                            <input type="hidden" name="base_time" value="{{ sched.base_time_24h }}">
+                                            <select name="portion" class="portion-mini" onchange="this.form.submit()">
+                                                {% for name, (cycles, desc) in portion_sizes.items() %}
+                                                    <option value="{{ name }}" {% if sched.portion == name %}selected{% endif %}>{{ name | capitalize }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </form>
+                                        <form action="/toggle_fixed" method="post" class="inline-form">
+                                            <input type="hidden" name="base_time" value="{{ sched.base_time_24h }}">
+                                            <button type="submit" class="btn-icon" title="{% if sched.is_fixed %}Unlock{% else %}Lock{% endif %}">
+                                                {% if sched.is_fixed %}🔓{% else %}🔒{% endif %}
+                                            </button>
+                                        </form>
+                                        <form action="/delete" method="post" class="inline-form"
+                                              onsubmit="return confirmDelete('{{ sched.actual_time_12h }}')">
+                                            <input type="hidden" name="base_time" value="{{ sched.base_time_24h }}">
+                                            <button type="submit" class="btn-icon btn-delete" title="Delete">✕</button>
+                                        </form>
+                                    </div>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p class="empty-state">No scheduled feedings yet</p>
+                    {% endif %}
+                </section>
+                
+            </div>
+        </aside>
+
+        <!-- Main Dashboard -->
+        <main class="dashboard">
+            <header class="dashboard-header">
+                <h1><span class="pet">Pet</span><span class="feedr">Feedr</span></h1>
+                <button class="settings-toggle" onclick="toggleSidebar()" title="Settings">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                </button>
+            </header>
+
+            <div class="dashboard-content">
+                <!-- Next Feeding Card -->
+                <section class="card next-feeding-card">
+                    <div class="card-label">Next Feeding</div>
+                    {% if next_feeding %}
+                        <div class="next-feeding-time">{{ next_feeding.actual_time_12h }}</div>
+                        <div class="next-feeding-portion">
+                            <span class="portion-badge portion-{{ next_feeding.portion }}">{{ next_feeding.portion }}</span>
+                            {% if next_feeding.randomized %}
+                                <span class="randomized-note">randomized</span>
+                            {% endif %}
+                        </div>
+                    {% else %}
+                        <div class="next-feeding-time">--:--</div>
+                        <div class="next-feeding-none">No feedings scheduled</div>
+                    {% endif %}
+                </section>
+
+                <!-- Today's Schedule -->
+                <section class="card schedule-card">
+                    <div class="card-label">Today's Schedule</div>
+                    {% if schedules %}
+                        <ul class="schedule-list">
+                            {% for sched in schedules %}
+                                <li class="schedule-item {% if sched.is_past %}is-past{% endif %} {% if sched.is_next %}is-next{% endif %}">
+                                    <span class="schedule-time">{{ sched.actual_time_12h }}</span>
+                                    <span class="schedule-portion portion-{{ sched.portion }}">{{ sched.portion }}</span>
+                                    {% if sched.is_fixed %}<span class="schedule-fixed">🔒</span>{% endif %}
+                                    {% if sched.is_past %}<span class="schedule-done">✓</span>{% endif %}
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p class="empty-state">No feedings scheduled</p>
+                    {% endif %}
+                    <div class="daily-summary">
+                        <span class="daily-label">Daily Total</span>
+                        <span class="daily-value">
+                            {% if daily_total == 0 %}
+                                0 cups
+                            {% elif daily_total == daily_total | int %}
+                                {{ daily_total | int }} cup{% if daily_total != 1 %}s{% endif %}
+                            {% else %}
+                                {{ daily_total }} cups
+                            {% endif %}
+                        </span>
+                    </div>
+                </section>
+
+                <!-- Manual Feed -->
+                <section class="card feed-card">
+                    <form action="/feed" method="post" class="feed-form" onsubmit="return confirmFeed(this)">
+                        <select name="portion" class="portion-select">
+                            {% for name, (cycles, desc) in portion_sizes.items() %}
+                                <option value="{{ name }}" {% if name == default_portion %}selected{% endif %}>
+                                    {{ name | capitalize }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <button type="submit" class="btn btn-feed">
+                            <span class="feed-icon">🐱</span>
+                            Feed Now
+                        </button>
+                    </form>
+                </section>
+
+                <!-- Recent Activity -->
+                <section class="card activity-card">
+                    <div class="card-label">Recent Activity</div>
+                    {% if recent_activity %}
+                        <ul class="activity-list">
+                            {% for event in recent_activity %}
+                                <li class="activity-item">
+                                    <span class="activity-date">{{ event.date }}</span>
+                                    <span class="activity-time">{{ event.time }}</span>
+                                    <span class="activity-portion portion-{{ event.portion }}">{{ event.portion }}</span>
+                                    <span class="activity-type">{{ event.type }}</span>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p class="empty-state">No recent activity</p>
+                    {% endif %}
+                </section>
+            </div>
+
+        </main>
+
+        <script src="{{ url_for('static', filename='main.js') }}"></script>
     </body>
 </html>
