@@ -1,13 +1,34 @@
 # PetFeedr
 
-PetFeedr is a project that aims to automate the feeding process for pets. It provides a convenient way for pet owners to schedule and control the feeding of their pets.
+An automated pet feeder powered by a Raspberry Pi. Schedule feedings, control portion sizes, and monitor activity through a web interface — all running on your local network.
 
-## Features (Intended)
+## Features
 
-- Schedule feeding times for your pets
-- Control the amount of food dispensed
-- Monitor feeding history and patterns
-- Receive notifications for feeding events
+- Schedule feeding times with configurable portion sizes (small, medium, large)
+- Optional schedule randomization (±30 min) to mimic natural feeding patterns
+- Web interface for managing schedules, triggering manual feedings, and viewing activity history
+- Stepper motor control (DRV8825) with anti-jam agitation
+- Simulation mode for development without hardware
+- Systemd service for reliable, always-on operation
+- Automatic daily schedule regeneration with fresh randomization
+
+## Hardware
+
+- Raspberry Pi (tested on Pi 3/4/5)
+- DRV8825 stepper motor driver
+- NEMA 17 stepper motor (or similar)
+- Food hopper and dispensing mechanism
+
+### GPIO Pin Mapping
+
+| Function    | GPIO Pin |
+|-------------|----------|
+| Direction   | 13       |
+| Step        | 19       |
+| Enable      | 12       |
+| Mode 1      | 16       |
+| Mode 2      | 17       |
+| Mode 3      | 20       |
 
 ## Quick Start (Raspberry Pi)
 
@@ -19,7 +40,11 @@ PetFeedr is a project that aims to automate the feeding process for pets. It pro
    cd PetFeedr
    ```
 
-2. Edit `deploy.sh` and `setup-pi.sh` to match your Pi's username and hostname if different from defaults.
+2. Configure the deploy script for your Pi (defaults shown):
+   ```bash
+   export PI_HOST="pi@petfeedr.local"   # your Pi user@hostname
+   export PI_PATH="/home/pi/PetFeedr"   # install path on Pi
+   ```
 
 3. Deploy to your Pi:
    ```bash
@@ -28,7 +53,7 @@ PetFeedr is a project that aims to automate the feeding process for pets. It pro
 
 4. SSH into your Pi and run the one-time setup:
    ```bash
-   ssh your-user@your-pi.local
+   ssh pi@your-pi.local
    cd ~/PetFeedr
    ./setup-pi.sh
    ```
@@ -37,62 +62,12 @@ PetFeedr is a project that aims to automate the feeding process for pets. It pro
 
 ### Deploying Updates
 
-After making code changes, simply run:
+After making code changes, run:
 ```bash
 ./deploy.sh
 ```
 
-This will:
-- 💾 Backup the current Pi installation to your Mac
-- ⏹️ Stop the service
-- 📦 Sync changed files
-- 📚 Update dependencies if needed
-- ▶️ Restart the service
-
-Backups are stored in `~/Documents/Homelab/PetFeedr/backups/` (last 10 kept).
-
-## Manual Installation
-
-If you prefer manual setup:
-
-1. Copy files to your Pi
-2. Create a virtual environment:
-   ```bash
-   cd ~/PetFeedr
-   python3 -m venv venv
-   source venv/bin/activate
-   pip install -r requirements-pi.txt
-   ```
-
-3. Create the systemd service file:
-   ```bash
-   sudo nano /etc/systemd/system/petfeedr.service
-   ```
-   
-   Add:
-   ```ini
-   [Unit]
-   Description=PetFeedr Service
-   After=multi-user.target
-
-   [Service]
-   Type=simple
-   User=<your-user>
-   WorkingDirectory=/path/to/PetFeedr
-   ExecStart=/bin/bash -c 'source /path/to/PetFeedr/venv/bin/activate && python /path/to/PetFeedr/PetFeedr.py'
-   Restart=always
-
-   [Install]
-   WantedBy=multi-user.target
-   ```
-   Replace `<your-user>` and `/path/to/PetFeedr` with your values.
-
-4. Enable and start the service:
-   ```bash
-   sudo systemctl daemon-reload
-   sudo systemctl enable petfeedr.service
-   sudo systemctl start petfeedr.service
-   ```
+This will back up the current Pi installation, sync changed files, update dependencies, and restart the service. Backups are stored locally (last 10 kept).
 
 ## Development (Mac/PC)
 
@@ -104,65 +79,89 @@ pip install -r requirements.txt
 python3 PetFeedr.py
 ```
 
-Simulation mode is enabled automatically when `RPi.GPIO` is not available.
-
-## Usage
-
-1. Access the PetFeedr web interface at `http://localhost:5000` (or `http://<pi-ip-address>:5000` from another device on your network)
-2. Set up feeding schedules using the web interface
-3. Monitor feeding events and adjust settings as needed
-4. Use the manual feed button to trigger feedings on demand
-
-## Simulation Mode
-
-PetFeedr can run in simulation mode for development and testing without needing actual hardware. This is useful for:
-- Developing on a laptop/desktop without GPIO access
-- Testing schedule changes without affecting the live pet feeder
-- Debugging the web interface
-
-**Automatic:** If `RPi.GPIO` is not installed (e.g., on a Mac or PC), simulation mode is enabled automatically.
-
-**Manual:** Force simulation mode by setting an environment variable:
+Simulation mode is enabled automatically when `RPi.GPIO` is not available. You can also force it:
 ```bash
 PETFEEDR_SIMULATE=true python3 PetFeedr.py
 ```
 
-In simulation mode:
-- 🔧 No GPIO/hardware is touched
-- 🔄 Motor movements are logged but not executed
-- ✅ The web interface works normally
+In simulation mode, no GPIO/hardware is touched — motor movements are logged but not executed, and the web interface works normally.
 
-## Maintaining the Raspberry Pi
+## Configuration
 
-To ensure a smooth update process and minimize the risk of data loss, it's recommended to create a backup of the Raspberry Pi's SD card before applying any updates.
+### Environment Variables
 
-### Creating a Backup Image
+| Variable             | Default              | Description                        |
+|----------------------|----------------------|------------------------------------|
+| `PI_HOST`            | `pi@petfeedr.local`  | SSH target for deploy script       |
+| `PI_PATH`            | `/home/pi/PetFeedr` | Install path on Pi                 |
+| `BACKUP_DIR`         | `$HOME/PetFeedr-backups` | Local backup directory         |
+| `PETFEEDR_PORT`      | `5000`               | Web interface port                 |
+| `PETFEEDR_SIMULATE`  | `false`              | Force simulation mode              |
+| `FLASK_SECRET_KEY`   | (random)             | Flask session secret key           |
+| `FLASK_DEBUG`        | `false`              | Enable Flask debug mode            |
 
-1. Power down your Raspberry Pi gracefully.
+## Manual Installation
 
-2. Remove the SD card from your Raspberry Pi and connect it to your laptop using an SD card reader.
+If you prefer manual setup on the Pi:
 
-3. Create an image of the SD card using a tool like Win32 Disk Imager (Windows) or by using the `dd` command (macOS/Linux).
+1. Copy files to your Pi
+2. Create a virtual environment:
+   ```bash
+   cd ~/PetFeedr
+   python3 -m venv venv
+   source venv/bin/activate
+   pip install -r requirements-pi.txt
+   ```
 
-4. Store the backup image in a safe location, such as an external hard drive or a cloud storage service.
+3. Create the systemd service:
+   ```bash
+   sudo nano /etc/systemd/system/petfeedr.service
+   ```
 
-### Updating the Raspberry Pi
+   ```ini
+   [Unit]
+   Description=PetFeedr Service
+   After=multi-user.target
 
-1. Power on your Raspberry Pi and SSH into it.
+   [Service]
+   Type=simple
+   User=<your-user>
+   WorkingDirectory=/home/<your-user>/PetFeedr
+   ExecStart=/bin/bash -c 'source /home/<your-user>/PetFeedr/venv/bin/activate && python /home/<your-user>/PetFeedr/PetFeedr.py'
+   Restart=always
 
-2. Update the system and installed packages:
-`sudo apt update`
-`sudo apt upgrade`
+   [Install]
+   WantedBy=multi-user.target
+   ```
 
-3. Review the list of available updates and proceed with the installation if you're comfortable with the changes.
+4. Enable and start:
+   ```bash
+   sudo systemctl daemon-reload
+   sudo systemctl enable petfeedr.service
+   sudo systemctl start petfeedr.service
+   ```
 
-4. Reboot your Raspberry Pi after the update process is complete:
-`sudo reboot`
+## Usage
 
-5. Verify that the PetFeedr script and other critical functionalities are working as expected.
+1. Access the web interface at `http://localhost:5000` (or `http://<pi-hostname>:5000`)
+2. Add feeding schedules with time, portion size, and optional randomization
+3. Use the manual feed button for on-demand feedings
+4. View recent activity in the feeding log
 
-Note: If any issues arise during the update process, you can flash the backup image back to the SD card to restore your system to its previous state.
+## Security Note
+
+The web interface has **no authentication** and listens on all network interfaces (`0.0.0.0`). This is designed for use on a trusted local network. Do not expose it to the public internet without adding authentication and HTTPS.
+
+## Useful Commands
+
+```bash
+sudo systemctl status petfeedr.service    # Check status
+sudo systemctl restart petfeedr.service   # Restart
+sudo journalctl -u petfeedr.service -f    # View logs
+```
 
 ## License
 
-This project is licensed under the...
+Copyright 2024 Jason Marsh
+
+Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for details.

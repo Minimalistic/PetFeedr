@@ -4,10 +4,10 @@
 
 set -e  # Exit on error
 
-PI_HOST="jason@petfeedr.local"
-PI_PATH="/home/jason/PetFeedr"
+PI_HOST="${PI_HOST:-pi@petfeedr.local}"
+PI_PATH="${PI_PATH:-/home/pi/PetFeedr}"
 LOCAL_PATH="$(cd "$(dirname "$0")" && pwd)"  # Get absolute path
-BACKUP_DIR="/Users/jasonmarsh/Documents/Homelab/PetFeedr/backups"
+BACKUP_DIR="${BACKUP_DIR:-$HOME/PetFeedr-backups}"
 
 # SSH multiplexing - reuse one connection for all commands (one password prompt!)
 SSH_CONTROL_PATH="/tmp/petfeedr-deploy-$$"

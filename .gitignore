@@ -28,5 +28,10 @@ todays_schedule.json
 .DS_Store
 Thumbs.db
 
+# Secrets
+SecretKeys.py
+*.env
+.env.*
+
 # Backups (if accidentally placed in repo)
 backups/

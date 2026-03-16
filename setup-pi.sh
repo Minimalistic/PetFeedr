@@ -4,7 +4,8 @@
 
 set -e
 
-PI_PATH="/home/jason/PetFeedr"
+PI_USER="${PI_USER:-$(whoami)}"
+PI_PATH="${PI_PATH:-/home/$PI_USER/PetFeedr}"
 SERVICE_FILE="/etc/systemd/system/petfeedr.service"
 
 echo "🐱 PetFeedr Pi Setup"
@@ -19,7 +20,7 @@ After=multi-user.target
 
 [Service]
 Type=simple
-User=jason
+User=$PI_USER
 WorkingDirectory=$PI_PATH
 ExecStart=/bin/bash -c 'source $PI_PATH/venv/bin/activate && python $PI_PATH/PetFeedr.py'
 Restart=always

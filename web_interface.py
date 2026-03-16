@@ -16,7 +16,7 @@ from flask import Flask, redirect, url_for, request, render_template, jsonify
 import schedule
 
 app = Flask(__name__)
-app.secret_key = 'petfeedr-local-key'
+app.secret_key = os.environ.get('FLASK_SECRET_KEY', os.urandom(24).hex())
 
 # Custom Jinja2 filter for formatting datetime objects
 @app.template_filter('strftime')
@@ -456,7 +456,7 @@ def main():
     schedule_thread = Thread(target=run_schedule)
     schedule_thread.start()
     logging.info(f"Starting web interface on port {WEB_PORT}")
-    app.run(host='0.0.0.0', port=WEB_PORT, debug=True)
+    app.run(host='0.0.0.0', port=WEB_PORT, debug=os.environ.get('FLASK_DEBUG', 'false').lower() == 'true')
 
 
 if __name__ == '__main__':
