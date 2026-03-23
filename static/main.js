@@ -1,11 +1,88 @@
+// ===== Dark Mode =====
+// Runs before DOM ready to prevent flash of wrong theme
+(function initTheme() {
+    const saved = localStorage.getItem('petfeedr-theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const theme = saved || (prefersDark ? 'dark' : 'light');
+    document.documentElement.setAttribute('data-theme', theme);
+})();
+
+function toggleTheme() {
+    const html = document.documentElement;
+    const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+    localStorage.setItem('petfeedr-theme', next);
+    updateThemeIcon(next);
+}
+
+function updateThemeIcon(theme) {
+    const icon = document.querySelector('.theme-icon');
+    if (icon) icon.textContent = theme === 'dark' ? '\u2600\uFE0F' : '\uD83C\uDF19';
+}
+
+// ===== Timeline =====
+function initTimeline() {
+    const timeline = document.querySelector('.timeline');
+    const nowEl = document.getElementById('timeline-now');
+    if (!timeline || !nowEl) return;
+
+    const start = parseInt(timeline.dataset.start);
+    const end = parseInt(timeline.dataset.end);
+
+    function updateNow() {
+        const d = new Date();
+        const mins = d.getHours() * 60 + d.getMinutes();
+        const pct = ((mins - start) / (end - start)) * 100;
+        if (pct < 0 || pct > 100) {
+            nowEl.style.display = 'none';
+        } else {
+            nowEl.style.display = '';
+            nowEl.style.left = pct + '%';
+        }
+    }
+    updateNow();
+    setInterval(updateNow, 60000);
+
+    // Tap to toggle tooltip on mobile
+    document.querySelectorAll('.timeline-dot').forEach(dot => {
+        dot.addEventListener('click', () => {
+            document.querySelectorAll('.timeline-dot.active').forEach(d => {
+                if (d !== dot) d.classList.remove('active');
+            });
+            dot.classList.toggle('active');
+        });
+    });
+}
+
+// Update icon and init features once DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+    updateThemeIcon(document.documentElement.getAttribute('data-theme') || 'light');
+    initCountdown();
+    initTimeline();
+    initAjaxForms();
+
+    // Register service worker for PWA
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js', { scope: '/' });
+    }
+});
+
+// ===== Layout =====
+// Large desktop breakpoint - sidebar is always visible
+const LG_BREAKPOINT = 1400;
+const lgQuery = window.matchMedia(`(min-width: ${LG_BREAKPOINT}px)`);
+
 // Toggle sidebar visibility
 function toggleSidebar() {
+    // Sidebar is always visible on large desktop — no-op
+    if (lgQuery.matches) return;
+
     const sidebar = document.querySelector('.sidebar');
     const overlay = document.querySelector('.sidebar-overlay');
-    
+
     sidebar.classList.toggle('active');
     overlay.classList.toggle('active');
-    
+
     // Prevent body scroll when sidebar is open
     if (sidebar.classList.contains('active')) {
         document.body.style.overflow = 'hidden';
@@ -14,25 +91,223 @@ function toggleSidebar() {
     }
 }
 
-// Confirmation for deleting a feeding time
-function confirmDelete(time) {
-    return confirm(`Delete the ${time} feeding?`);
+// Open sidebar and focus the add-feeding form
+function openAddFeeding() {
+    const sidebar = document.querySelector('.sidebar');
+    if (!sidebar) return;
+
+    // Open sidebar if it's not already visible
+    if (!lgQuery.matches && !sidebar.classList.contains('active')) {
+        toggleSidebar();
+    }
+
+    // Wait for sidebar transition to finish before focusing
+    setTimeout(() => {
+        const timeInput = document.getElementById('feeding_time');
+        if (timeInput) {
+            timeInput.focus();
+            // Scroll the sidebar content to show the form
+            const sidebarContent = document.querySelector('.sidebar-content');
+            if (sidebarContent) sidebarContent.scrollTop = 0;
+        }
+        const form = document.querySelector('.add-form');
+        if (form) {
+            form.classList.add('highlight');
+            setTimeout(() => form.classList.remove('highlight'), 1500);
+        }
+    }, 400); // matches sidebar transition duration (0.35s)
 }
 
-// Confirmation for changing portion size
-function confirmChange(message) {
-    return confirm(message);
+// Clean up sidebar state when crossing into large desktop
+lgQuery.addEventListener('change', (e) => {
+    if (e.matches) {
+        document.querySelector('.sidebar').classList.remove('active');
+        document.querySelector('.sidebar-overlay').classList.remove('active');
+        document.body.style.overflow = '';
+    }
+});
+
+// ===== Toasts =====
+function showToast(message, type = 'info', duration = 3500) {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+    container.appendChild(toast);
+    setTimeout(() => {
+        toast.classList.add('removing');
+        toast.addEventListener('animationend', () => toast.remove());
+    }, duration);
 }
 
-// Confirmation for manual feeding
-function confirmFeed(form) {
-    const portion = form.querySelector('select[name="portion"]').value;
-    return confirm(`Dispense a ${portion} portion now?`);
+// ===== Inline Confirm =====
+function confirmAction(button, onConfirm) {
+    if (button.dataset.confirming === 'true') {
+        clearTimeout(Number(button.dataset.confirmTimer));
+        delete button.dataset.confirming;
+        button.classList.remove('confirming');
+        onConfirm();
+        return;
+    }
+    const origHTML = button.innerHTML;
+    const origClass = button.className;
+    button.dataset.confirming = 'true';
+    button.innerHTML = 'Sure?';
+    button.classList.add('confirming');
+    const timer = setTimeout(() => {
+        button.innerHTML = origHTML;
+        button.className = origClass;
+        delete button.dataset.confirming;
+    }, 3000);
+    button.dataset.confirmTimer = timer;
 }
+
+// ===== AJAX Form Submission =====
+async function submitForm(form) {
+    const url = form.action;
+    const formData = new FormData(form);
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            body: formData,
+            headers: { 'Accept': 'application/json' }
+        });
+        const data = await response.json();
+        if (data.success) {
+            showToast(data.message, 'success');
+            setTimeout(() => window.location.reload(), 500);
+        } else {
+            showToast(data.message || 'Something went wrong', 'error');
+        }
+    } catch (err) {
+        showToast('Network error — please try again', 'error');
+    }
+}
+
+function initAjaxForms() {
+    // Add feeding form
+    document.querySelector('.add-form')?.addEventListener('submit', function(e) {
+        e.preventDefault();
+        submitForm(this);
+    });
+
+    // Feed now — with inline confirm on circle button
+    const feedForm = document.querySelector('.feed-form');
+    feedForm?.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const btn = this.querySelector('.feed-circle-btn');
+        if (!btn) return;
+        confirmAction(btn, () => {
+            submitForm(this).then(() => {
+                // Ripple + pulse effect
+                const ripple = document.createElement('span');
+                ripple.className = 'ripple';
+                btn.appendChild(ripple);
+                btn.classList.add('fed');
+                ripple.addEventListener('animationend', () => ripple.remove());
+                setTimeout(() => btn.classList.remove('fed'), 1000);
+            });
+        });
+    });
+
+    // Portion segmented control description
+    document.querySelectorAll('.portion-segmented input').forEach(radio => {
+        radio.addEventListener('change', () => {
+            const desc = document.getElementById('portion-desc');
+            if (desc && typeof portionDescriptions !== 'undefined') {
+                desc.textContent = portionDescriptions[radio.value] || '';
+            }
+        });
+        // Init the selected one
+        if (radio.checked) radio.dispatchEvent(new Event('change'));
+    });
+
+    // Delete forms — with inline confirm
+    document.querySelectorAll('form[action="/delete"]').forEach(form => {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const btn = this.querySelector('.btn-delete');
+            confirmAction(btn, () => submitForm(this));
+        });
+    });
+
+    // Portion change (auto-submit on select change)
+    document.querySelectorAll('form[action="/update_portion"]').forEach(form => {
+        form.querySelector('select')?.addEventListener('change', () => submitForm(form));
+        form.addEventListener('submit', e => e.preventDefault());
+    });
+
+    // Toggle fixed (no confirmation needed)
+    document.querySelectorAll('form[action="/toggle_fixed"]').forEach(form => {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            submitForm(this);
+        });
+    });
+}
+
+// ===== Countdown Timer =====
+function initCountdown() {
+    const card = document.querySelector('.next-feeding-card');
+    const nextTime = card?.dataset.nextFeeding;
+    if (!nextTime) return;
+
+    let countdownEl = document.getElementById('feeding-countdown');
+    if (!countdownEl) {
+        countdownEl = document.createElement('div');
+        countdownEl.id = 'feeding-countdown';
+        countdownEl.className = 'feeding-countdown';
+        const timeEl = card.querySelector('.next-feeding-time');
+        if (timeEl) timeEl.after(countdownEl);
+    }
+
+    let lastText = '';
+
+    function tick() {
+        const now = new Date();
+        const [h, m] = nextTime.split(':').map(Number);
+        const target = new Date(now);
+        target.setHours(h, m, 0, 0);
+        if (target <= now) target.setDate(target.getDate() + 1);
+
+        const diffMin = Math.floor((target - now) / 60000);
+        const hours = Math.floor(diffMin / 60);
+        const mins = diffMin % 60;
+
+        let newText;
+        if (hours > 0) {
+            newText = `in ${hours}h ${mins}m`;
+        } else if (mins > 0) {
+            newText = `in ${mins}m`;
+        } else {
+            newText = 'any moment now';
+        }
+
+        if (newText !== lastText) {
+            countdownEl.classList.add('updating');
+            setTimeout(() => {
+                countdownEl.textContent = newText;
+                countdownEl.classList.remove('updating');
+            }, 150);
+            lastText = newText;
+        }
+    }
+
+    tick();
+    setInterval(tick, 1000);
+}
+
+// Auto-refresh every 60s (skip if user is interacting with a form)
+setInterval(() => {
+    const tag = document.activeElement?.tagName;
+    if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+    window.location.reload();
+}, 60000);
 
 // Close sidebar on escape key
 document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
+    if (e.key === 'Escape' && !lgQuery.matches) {
         const sidebar = document.querySelector('.sidebar');
         if (sidebar.classList.contains('active')) {
             toggleSidebar();
@@ -40,13 +315,15 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-// Close sidebar when clicking outside on mobile
+// Close sidebar when clicking outside on mobile/tablet
 document.addEventListener('click', (e) => {
+    if (lgQuery.matches) return;
+
     const sidebar = document.querySelector('.sidebar');
     const settingsToggle = document.querySelector('.settings-toggle');
-    
-    if (sidebar.classList.contains('active') && 
-        !sidebar.contains(e.target) && 
+
+    if (sidebar.classList.contains('active') &&
+        !sidebar.contains(e.target) &&
         !settingsToggle.contains(e.target)) {
         toggleSidebar();
     }

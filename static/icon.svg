@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#00838f"/>
+  <g transform="translate(256,240)" fill="none" stroke="#fff" stroke-width="20" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Bowl -->
+    <ellipse cx="0" cy="80" rx="130" ry="45"/>
+    <path d="M-130 80 C-130 80 -120 140 0 140 S130 80 130 80"/>
+    <!-- Kibble dots -->
+    <circle cx="-40" cy="65" r="12" fill="#fff" stroke="none"/>
+    <circle cx="20" cy="55" r="10" fill="#fff" stroke="none"/>
+    <circle cx="-10" cy="80" r="9" fill="#fff" stroke="none"/>
+    <circle cx="50" cy="75" r="11" fill="#fff" stroke="none"/>
+    <!-- Cat ears -->
+    <path d="M-80,-80 L-60,-140 L-20,-90" fill="#fff" stroke="none"/>
+    <path d="M80,-80 L60,-140 L20,-90" fill="#fff" stroke="none"/>
+    <!-- Cat face -->
+    <circle cx="0" cy="-50" r="65" fill="#fff" stroke="none"/>
+    <!-- Eyes -->
+    <circle cx="-22" cy="-60" r="8" fill="#00838f" stroke="none"/>
+    <circle cx="22" cy="-60" r="8" fill="#00838f" stroke="none"/>
+    <!-- Nose -->
+    <path d="M-6,-42 L6,-42 L0,-36 Z" fill="#f08080" stroke="none"/>
+    <!-- Whiskers -->
+    <line x1="-70" y1="-45" x2="-35" y2="-42" stroke="#00838f" stroke-width="4"/>
+    <line x1="-68" y1="-55" x2="-35" y2="-50" stroke="#00838f" stroke-width="4"/>
+    <line x1="70" y1="-45" x2="35" y2="-42" stroke="#00838f" stroke-width="4"/>
+    <line x1="68" y1="-55" x2="35" y2="-50" stroke="#00838f" stroke-width="4"/>
+  </g>
+</svg>

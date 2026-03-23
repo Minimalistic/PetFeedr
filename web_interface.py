@@ -8,6 +8,9 @@ import logging
 from threading import Thread
 from PetFeedr import feed_pet, load_todays_schedule, save_todays_schedule, apply_random_offset, TODAYS_SCHEDULE_FILE
 from servo_controller import PORTION_SIZES, DEFAULT_PORTION
+from DRV8825 import SIMULATION_MODE
+
+APP_VERSION = "1.1.0"
 
 # Configurable port - default 5000, override with PETFEEDR_PORT env var
 WEB_PORT = int(os.environ.get('PETFEEDR_PORT', 5000))
@@ -17,6 +20,12 @@ import schedule
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', os.urandom(24).hex())
+
+
+def wants_json():
+    """Check if the client prefers a JSON response."""
+    return request.accept_mimetypes.best_match(
+        ['application/json', 'text/html']) == 'application/json'
 
 # Custom Jinja2 filter for formatting datetime objects
 @app.template_filter('strftime')
@@ -222,6 +231,41 @@ def format_activity_date(dt):
         return dt.strftime("%b %d")  # "Jan 05"
 
 
+def parse_weekly_stats():
+    """Aggregate feeding data for the last 7 days by portion size."""
+    try:
+        with open('feeding_log.txt', 'r') as file:
+            lines = file.readlines()
+    except FileNotFoundError:
+        return []
+
+    today = datetime.now().date()
+    stats = {}
+    for i in range(6, -1, -1):
+        d = today - timedelta(days=i)
+        stats[d.isoformat()] = {
+            'date': d.isoformat(),
+            'day_label': d.strftime('%a'),
+            'is_today': d == today,
+            'small': 0, 'medium': 0, 'large': 0,
+            'total_cups': 0.0
+        }
+
+    cups_map = {'small': 0.25, 'medium': 0.50, 'large': 0.75}
+    manual_pat = re.compile(r'^(\d{4}-\d{2}-\d{2}) \d{2}:\d{2}:\d{2} - Manual feeding triggered \((\w+) portion\)')
+    sched_pat = re.compile(r'^(\d{4}-\d{2}-\d{2}) \d{2}:\d{2}:\d{2} - Feeding at .* \((\w+) portion\)')
+
+    for line in lines:
+        match = manual_pat.match(line.strip()) or sched_pat.match(line.strip())
+        if match:
+            date_str, portion = match.groups()
+            if date_str in stats and portion in cups_map:
+                stats[date_str][portion] += 1
+                stats[date_str]['total_cups'] += cups_map[portion]
+
+    return list(stats.values())
+
+
 # Configure logging
 logging.basicConfig(filename='feeding_log.txt', level=logging.INFO,
     format='%(asctime)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
@@ -241,17 +285,53 @@ def index():
     daily_total = calculate_daily_total(schedules)
     next_feeding = get_next_feeding(schedules)
     recent_activity = parse_recent_activity(days=14, limit=30)
-    
+    all_fed_today = bool(schedules) and all(s.get('is_past') for s in schedules)
+    last_feeding = recent_activity[0] if recent_activity else None
+
+    # Timeline data
+    for s in schedules:
+        h, m = s['actual_time_24h'].split(':')
+        s['time_minutes'] = int(h) * 60 + int(m)
+
+    if schedules:
+        times_min = [s['time_minutes'] for s in schedules]
+        timeline_start = max(0, min(times_min) - 60)
+        timeline_end = min(1439, max(times_min) + 60)
+    else:
+        timeline_start, timeline_end = 360, 1320  # 6AM-10PM default
+
+    timeline_hours = []
+    first_hour = ((timeline_start // 60) + 1) * 60
+    for mins in range(first_hour, timeline_end, 120):
+        h = mins // 60
+        label = f"{h % 12 or 12}{'AM' if h < 12 else 'PM'}"
+        pct = ((mins - timeline_start) / (timeline_end - timeline_start)) * 100
+        timeline_hours.append({'label': label, 'pct': pct})
+
+    # Weekly stats
+    weekly_stats = parse_weekly_stats()
+    max_daily_cups = max((d['total_cups'] for d in weekly_stats), default=0.5)
+    max_daily_cups = max(max_daily_cups, 0.5)
+
     portion_info = {name: desc for name, (cycles, desc) in PORTION_SIZES.items()}
-    
-    return render_template('index.html', 
+
+    return render_template('index.html',
                            schedules=schedules,
                            next_feeding=next_feeding,
                            recent_activity=recent_activity,
                            portion_sizes=PORTION_SIZES,
                            portion_info=portion_info,
                            default_portion=DEFAULT_PORTION,
-                           daily_total=daily_total)
+                           daily_total=daily_total,
+                           all_fed_today=all_fed_today,
+                           simulation_mode=SIMULATION_MODE,
+                           app_version=APP_VERSION,
+                           last_feeding=last_feeding,
+                           timeline_start=timeline_start,
+                           timeline_end=timeline_end,
+                           timeline_hours=timeline_hours,
+                           weekly_stats=weekly_stats,
+                           max_daily_cups=max_daily_cups)
 
 
 @app.route('/add', methods=['POST'])
@@ -274,6 +354,8 @@ def add_job():
                 continue
             existing_time = line.split(',')[0]
             if existing_time == feeding_time:
+                if wants_json():
+                    return jsonify({'success': False, 'message': 'Feeding time already exists'}), 409
                 return "Feeding time already exists. <a href='/'>Go back</a>", 400
 
         # Write the feeding time
@@ -311,10 +393,14 @@ def add_job():
         else:
             logging.info(f"Added feeding time: {feeding_time_12h} → {actual_time_12h} ({portion} portion)")
 
+        if wants_json():
+            return jsonify({'success': True, 'message': f'Added {feeding_time_12h} feeding'})
         return redirect('/')
 
     except Exception as e:
         logging.error(f"Error writing to feeding_schedules.txt: {str(e)}")
+        if wants_json():
+            return jsonify({'success': False, 'message': 'Error adding feeding time'}), 500
         return "An error occurred while adding the feeding time.", 500
 
 
@@ -336,9 +422,13 @@ def delete_job():
         save_todays_schedule(todays_schedule)
 
         logging.info(f"Deleted feeding time: {base_time}")
+        if wants_json():
+            return jsonify({'success': True, 'message': 'Feeding deleted'})
         return redirect('/')
     except Exception as e:
         logging.error(f"Error deleting feeding time: {str(e)}")
+        if wants_json():
+            return jsonify({'success': False, 'message': 'Error deleting feeding time'}), 500
         return "An error occurred while deleting the feeding time.", 500
 
 
@@ -397,10 +487,15 @@ def toggle_fixed():
                 'randomized': actual_time != base_time
             })
             save_todays_schedule(todays_schedule)
-        
+
+        status = 'fixed' if new_is_fixed else 'randomized'
+        if wants_json():
+            return jsonify({'success': True, 'message': f'Feeding set to {status}'})
         return redirect('/')
     except Exception as e:
         logging.error(f"Error toggling fixed status: {str(e)}")
+        if wants_json():
+            return jsonify({'success': False, 'message': 'Error toggling fixed status'}), 500
         return "An error occurred.", 500
 
 
@@ -435,9 +530,13 @@ def update_portion():
             file.writelines(new_lines)
         
         logging.info(f"Updated portion for {base_time} to {new_portion}")
+        if wants_json():
+            return jsonify({'success': True, 'message': f'Portion updated to {new_portion}'})
         return redirect('/')
     except Exception as e:
         logging.error(f"Error updating portion: {str(e)}")
+        if wants_json():
+            return jsonify({'success': False, 'message': 'Error updating portion'}), 500
         return "An error occurred.", 500
 
 
@@ -449,7 +548,19 @@ def trigger_feeding():
         portion = DEFAULT_PORTION
     
     feed_pet(portion=portion)
+    logging.info(f"Manual feeding triggered ({portion} portion)")
+    if wants_json():
+        return jsonify({'success': True, 'message': f'Dispensed {portion} portion'})
     return redirect('/')
+
+
+@app.route('/sw.js')
+def service_worker():
+    """Serve service worker from root scope."""
+    return app.send_static_file('sw.js'), 200, {
+        'Content-Type': 'application/javascript',
+        'Service-Worker-Allowed': '/'
+    }
 
 
 def main():

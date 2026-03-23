@@ -7,6 +7,11 @@
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
         <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;500;600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
         <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles.css') }}">
+        <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+        <meta name="theme-color" content="#00838f">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+        <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='icon.svg') }}">
     </head>
     <body>
         <!-- Settings Sidebar -->
@@ -59,10 +64,9 @@
                                         {% if sched.is_fixed %}<span class="fixed-icon">🔒</span>{% endif %}
                                     </div>
                                     <div class="edit-schedule-actions">
-                                        <form action="/update_portion" method="post" class="inline-form" 
-                                              onsubmit="return confirmChange('Change portion size for {{ sched.actual_time_12h }}?')">
+                                        <form action="/update_portion" method="post" class="inline-form">
                                             <input type="hidden" name="base_time" value="{{ sched.base_time_24h }}">
-                                            <select name="portion" class="portion-mini" onchange="this.form.submit()">
+                                            <select name="portion" class="portion-mini">
                                                 {% for name, (cycles, desc) in portion_sizes.items() %}
                                                     <option value="{{ name }}" {% if sched.portion == name %}selected{% endif %}>{{ name | capitalize }}</option>
                                                 {% endfor %}
@@ -74,8 +78,7 @@
                                                 {% if sched.is_fixed %}🔓{% else %}🔒{% endif %}
                                             </button>
                                         </form>
-                                        <form action="/delete" method="post" class="inline-form"
-                                              onsubmit="return confirmDelete('{{ sched.actual_time_12h }}')">
+                                        <form action="/delete" method="post" class="inline-form">
                                             <input type="hidden" name="base_time" value="{{ sched.base_time_24h }}">
                                             <button type="submit" class="btn-icon btn-delete" title="Delete">✕</button>
                                         </form>
@@ -95,19 +98,40 @@
         <main class="dashboard">
             <header class="dashboard-header">
                 <h1><span class="pet">Pet</span><span class="feedr">Feedr</span></h1>
-                <button class="settings-toggle" onclick="toggleSidebar()" title="Settings">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="3"></circle>
-                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-                    </svg>
-                </button>
+                <div class="dashboard-header-actions">
+                    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode" aria-label="Toggle dark mode">
+                        <span class="theme-icon"></span>
+                    </button>
+                    <button class="settings-toggle" onclick="toggleSidebar()" title="Settings">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                        </svg>
+                    </button>
+                </div>
             </header>
 
             <div class="dashboard-content">
                 <!-- Next Feeding Card -->
-                <section class="card next-feeding-card">
+                <section class="card next-feeding-card {% if all_fed_today %}all-fed{% endif %}" data-next-feeding="{{ next_feeding.actual_time_24h if next_feeding and not all_fed_today else '' }}">
                     <div class="card-label">Next Feeding</div>
-                    {% if next_feeding %}
+                    {% if all_fed_today and next_feeding %}
+                        <div class="all-fed-content">
+                            <svg class="all-fed-illustration" width="80" height="80" viewBox="0 0 100 100" fill="none">
+                                <circle cx="50" cy="45" r="30" fill="white" opacity="0.9"/>
+                                <path d="M25,35 L32,10 L42,30" fill="white" opacity="0.9"/>
+                                <path d="M75,35 L68,10 L58,30" fill="white" opacity="0.9"/>
+                                <path d="M35,42 Q42,36 49,42" stroke="#555" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+                                <path d="M51,42 Q58,36 65,42" stroke="#555" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+                                <path d="M46,50 L50,53 L54,50" stroke="#f08080" stroke-width="2" fill="#f08080" stroke-linejoin="round"/>
+                                <text x="72" y="25" font-size="10" fill="white" opacity="0.7" font-family="sans-serif">z</text>
+                                <text x="80" y="18" font-size="13" fill="white" opacity="0.5" font-family="sans-serif">z</text>
+                                <text x="86" y="8" font-size="16" fill="white" opacity="0.3" font-family="sans-serif">z</text>
+                            </svg>
+                            <div class="all-fed-text">All fed for today!</div>
+                            <div class="all-fed-subtext">Next feeding tomorrow at {{ next_feeding.actual_time_12h }}</div>
+                        </div>
+                    {% elif next_feeding %}
                         <div class="next-feeding-time">{{ next_feeding.actual_time_12h }}</div>
                         <div class="next-feeding-portion">
                             <span class="portion-badge portion-{{ next_feeding.portion }}">{{ next_feeding.portion }}</span>
@@ -121,22 +145,46 @@
                     {% endif %}
                 </section>
 
-                <!-- Today's Schedule -->
+                <!-- Today's Schedule (Timeline) -->
                 <section class="card schedule-card">
                     <div class="card-label">Today's Schedule</div>
                     {% if schedules %}
-                        <ul class="schedule-list">
-                            {% for sched in schedules %}
-                                <li class="schedule-item {% if sched.is_past %}is-past{% endif %} {% if sched.is_next %}is-next{% endif %}">
-                                    <span class="schedule-time">{{ sched.actual_time_12h }}</span>
-                                    <span class="schedule-portion portion-{{ sched.portion }}">{{ sched.portion }}</span>
-                                    {% if sched.is_fixed %}<span class="schedule-fixed">🔒</span>{% endif %}
-                                    {% if sched.is_past %}<span class="schedule-done">✓</span>{% endif %}
-                                </li>
-                            {% endfor %}
-                        </ul>
+                        <div class="timeline" data-start="{{ timeline_start }}" data-end="{{ timeline_end }}">
+                            <div class="timeline-bar">
+                                <div class="timeline-now" id="timeline-now"></div>
+                                {% for sched in schedules %}
+                                    {% set range = timeline_end - timeline_start %}
+                                    {% set pct = ((sched.time_minutes - timeline_start) / range * 100) if range > 0 else 50 %}
+                                    <div class="timeline-dot {% if sched.is_past %}is-past{% endif %} {% if sched.is_next %}is-next{% endif %} portion-{{ sched.portion }}"
+                                         style="--dot-pos: {{ pct }}%;">
+                                        <div class="timeline-tooltip">
+                                            {{ sched.actual_time_12h }}<br>
+                                            <span class="portion-{{ sched.portion }}">{{ sched.portion }}</span>
+                                            {% if sched.is_fixed %} 🔒{% endif %}
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                            <div class="timeline-hours">
+                                {% for hour in timeline_hours %}
+                                    <span class="timeline-hour-label" style="left: {{ hour.pct }}%;">{{ hour.label }}</span>
+                                {% endfor %}
+                            </div>
+                        </div>
                     {% else %}
-                        <p class="empty-state">No feedings scheduled</p>
+                        <div class="empty-onboarding">
+                            <svg class="empty-icon" width="48" height="48" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <ellipse cx="24" cy="36" rx="18" ry="8"/>
+                                <path d="M6 36v-4c0-4.4 8.1-8 18-8s18 3.6 18 8v4"/>
+                                <circle cx="16" cy="12" r="4"/>
+                                <circle cx="32" cy="12" r="4"/>
+                                <path d="M16 8c-1-3-4-5-4-5"/>
+                                <path d="M32 8c1-3 4-5 4-5"/>
+                            </svg>
+                            <h3>No feedings scheduled yet</h3>
+                            <p>Set up your pet's feeding times to get started.</p>
+                            <button class="btn btn-secondary" onclick="openAddFeeding()">Add First Feeding</button>
+                        </div>
                     {% endif %}
                     <div class="daily-summary">
                         <span class="daily-label">Daily Total</span>
@@ -154,35 +202,75 @@
 
                 <!-- Manual Feed -->
                 <section class="card feed-card">
-                    <form action="/feed" method="post" class="feed-form" onsubmit="return confirmFeed(this)">
-                        <select name="portion" class="portion-select">
-                            {% for name, (cycles, desc) in portion_sizes.items() %}
-                                <option value="{{ name }}" {% if name == default_portion %}selected{% endif %}>
-                                    {{ name | capitalize }}
-                                </option>
-                            {% endfor %}
-                        </select>
-                        <button type="submit" class="btn btn-feed">
-                            <span class="feed-icon">🐱</span>
-                            Feed Now
+                    <div class="card-label">Manual Feed</div>
+                    <form action="/feed" method="post" class="feed-form">
+                        <button type="submit" class="feed-circle-btn">
+                            <span class="feed-circle-icon">🐱</span>
                         </button>
+                        <div class="portion-segmented">
+                            {% for name, (cycles, desc) in portion_sizes.items() %}
+                                <label class="portion-segment">
+                                    <input type="radio" name="portion" value="{{ name }}"
+                                           {% if name == default_portion %}checked{% endif %}>
+                                    <span class="portion-segment-label portion-{{ name }}">{{ name[0] | upper }}</span>
+                                </label>
+                            {% endfor %}
+                        </div>
+                        <div class="portion-description" id="portion-desc"></div>
                     </form>
+                </section>
+                <script>const portionDescriptions = {{ portion_info | tojson }};</script>
+
+                <!-- Weekly Stats -->
+                <section class="card stats-card">
+                    <div class="card-label">This Week</div>
+                    {% if weekly_stats %}
+                        <div class="bar-chart" style="--chart-max: {{ max_daily_cups }};">
+                            {% for day in weekly_stats %}
+                                <div class="bar-column {% if day.is_today %}is-today{% endif %}">
+                                    <div class="bar-stack">
+                                        {% if day.large > 0 %}
+                                            <div class="bar-segment bar-large" style="--seg-cups: {{ day.large * 0.75 }};"></div>
+                                        {% endif %}
+                                        {% if day.medium > 0 %}
+                                            <div class="bar-segment bar-medium" style="--seg-cups: {{ day.medium * 0.5 }};"></div>
+                                        {% endif %}
+                                        {% if day.small > 0 %}
+                                            <div class="bar-segment bar-small" style="--seg-cups: {{ day.small * 0.25 }};"></div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="bar-label">{{ day.day_label }}</div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="empty-state">No feeding data yet</p>
+                    {% endif %}
                 </section>
 
                 <!-- Recent Activity -->
                 <section class="card activity-card">
                     <div class="card-label">Recent Activity</div>
                     {% if recent_activity %}
-                        <ul class="activity-list">
-                            {% for event in recent_activity %}
-                                <li class="activity-item">
-                                    <span class="activity-date">{{ event.date }}</span>
-                                    <span class="activity-time">{{ event.time }}</span>
-                                    <span class="activity-portion portion-{{ event.portion }}">{{ event.portion }}</span>
-                                    <span class="activity-type">{{ event.type }}</span>
-                                </li>
-                            {% endfor %}
-                        </ul>
+                        <details class="activity-details">
+                            <summary class="activity-summary">View feeding log</summary>
+                            <div class="activity-groups">
+                                {% for date_label, events in recent_activity|groupby('date') %}
+                                    <div class="activity-group">
+                                        <div class="activity-date-header">{{ date_label }}</div>
+                                        <ul class="activity-list">
+                                            {% for event in events %}
+                                                <li class="activity-item">
+                                                    <span class="activity-time">{{ event.time }}</span>
+                                                    <span class="activity-portion portion-{{ event.portion }}">{{ event.portion }}</span>
+                                                    <span class="activity-type">{{ event.type }}</span>
+                                                </li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </details>
                     {% else %}
                         <p class="empty-state">No recent activity</p>
                     {% endif %}
@@ -191,6 +279,19 @@
 
         </main>
 
+        <footer class="status-footer">
+            <span class="footer-item">v{{ app_version }}</span>
+            <span class="footer-divider">·</span>
+            <span class="footer-item {% if simulation_mode %}footer-sim{% endif %}">
+                {{ "Simulation" if simulation_mode else "Live" }}
+            </span>
+            {% if last_feeding %}
+                <span class="footer-divider">·</span>
+                <span class="footer-item">Last fed: {{ last_feeding.date }} at {{ last_feeding.time }}</span>
+            {% endif %}
+        </footer>
+
+        <div id="toast-container" aria-live="polite"></div>
         <script src="{{ url_for('static', filename='main.js') }}"></script>
     </body>
 </html>
