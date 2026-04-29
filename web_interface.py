@@ -4,6 +4,7 @@ import os
 import re
 import time
 import json
+import glob
 import logging
 from threading import Thread
 from PetFeedr import feed_pet, load_todays_schedule, save_todays_schedule, apply_random_offset, TODAYS_SCHEDULE_FILE
@@ -148,12 +149,30 @@ def mark_past_feedings(schedules):
     return schedules
 
 
+def read_all_log_lines():
+    """Read lines from feeding_log.txt and all rotated copies (feeding_log.txt.YYYY-MM-DD)."""
+    lines = []
+    # rotated files are older, sort them so oldest come first
+    rotated = sorted(glob.glob('feeding_log.txt.*'))
+    for path in rotated:
+        try:
+            with open(path, 'r') as f:
+                lines.extend(f.readlines())
+        except (FileNotFoundError, OSError):
+            continue
+    # current log file has the newest entries
+    try:
+        with open('feeding_log.txt', 'r') as f:
+            lines.extend(f.readlines())
+    except FileNotFoundError:
+        pass
+    return lines
+
+
 def parse_recent_activity(days=14, limit=50):
     """Parse feeding log to extract recent activity in a user-friendly format."""
-    try:
-        with open('feeding_log.txt', 'r') as file:
-            lines = file.readlines()
-    except FileNotFoundError:
+    lines = read_all_log_lines()
+    if not lines:
         return []
     
     activity = []
@@ -233,10 +252,8 @@ def format_activity_date(dt):
 
 def parse_weekly_stats():
     """Aggregate feeding data for the last 7 days by portion size."""
-    try:
-        with open('feeding_log.txt', 'r') as file:
-            lines = file.readlines()
-    except FileNotFoundError:
+    lines = read_all_log_lines()
+    if not lines:
         return []
 
     today = datetime.now().date()
