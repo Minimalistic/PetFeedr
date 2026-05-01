@@ -181,8 +181,10 @@ def parse_recent_activity(days=14, limit=50):
     # Patterns to match different log entries
     # Manual feeding: "Manual feeding triggered (medium portion)"
     # Scheduled feeding: "Feeding at 08:00 AM (small portion)"
+    # Completed feeding (Python logging format): "2026-04-29 06:00:00,908 - INFO - Feeding completed in 0.31s (small portion)"
     manual_pattern = re.compile(r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) - Manual feeding triggered \((\w+) portion\)')
     scheduled_pattern = re.compile(r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) - Feeding at .* \((\w+) portion\)')
+    completed_pattern = re.compile(r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}),\d+ - INFO - Feeding completed in [\d.]+s \((\w+) portion\)')
     
     for line in reversed(lines):
         line = line.strip()
@@ -219,7 +221,7 @@ def parse_recent_activity(days=14, limit=50):
                 timestamp = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
                 if timestamp < cutoff_date:
                     break
-                
+
                 activity.append({
                     'date': format_activity_date(timestamp),
                     'time': timestamp.strftime("%I:%M %p"),
@@ -228,10 +230,32 @@ def parse_recent_activity(days=14, limit=50):
                 })
             except ValueError:
                 continue
-            
+
             if len(activity) >= limit:
                 break
-    
+            continue
+
+        # Try completed feeding pattern (Python logging format)
+        match = completed_pattern.match(line)
+        if match:
+            timestamp_str, portion = match.groups()
+            try:
+                timestamp = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
+                if timestamp < cutoff_date:
+                    break
+
+                activity.append({
+                    'date': format_activity_date(timestamp),
+                    'time': timestamp.strftime("%I:%M %p"),
+                    'portion': portion,
+                    'type': 'scheduled'
+                })
+            except ValueError:
+                continue
+
+            if len(activity) >= limit:
+                break
+
     return activity
 
 
