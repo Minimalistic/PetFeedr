@@ -35,3 +35,5 @@ SecretKeys.py
 
 # Backups (if accidentally placed in repo)
 backups/
+
+data/
