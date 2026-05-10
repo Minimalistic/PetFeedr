@@ -97,10 +97,10 @@
         <!-- Main Dashboard -->
         <main class="dashboard">
             <header class="dashboard-header">
-                <a href="http://100.71.235.97:3001" class="dashboard-back-link" id="dashboard-link" title="Back to Dashboard" style="display:none">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-                </a>
-                <h1><span class="pet">Pet</span><span class="feedr">Feedr</span></h1>
+                <div class="header-brand">
+                    <img src="{{ url_for('static', filename='logo.svg') }}" alt="PetFeedr" class="header-logo">
+                    <h1><span class="pet">Pet</span><span class="feedr">Feedr</span></h1>
+                </div>
                 <div class="dashboard-header-actions">
                     <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode" aria-label="Toggle dark mode">
                         <span class="theme-icon"></span>
@@ -170,7 +170,10 @@
                             </div>
                             <div class="timeline-hours">
                                 {% for hour in timeline_hours %}
-                                    <span class="timeline-hour-label" style="left: {{ hour.pct }}%;">{{ hour.label }}</span>
+                                    <span class="timeline-hour-tick {% if hour.label %}has-label{% endif %}" style="left: {{ hour.pct }}%;"></span>
+                                    {% if hour.label %}
+                                        <span class="timeline-hour-label" style="left: {{ hour.pct }}%;">{{ hour.label }}</span>
+                                    {% endif %}
                                 {% endfor %}
                             </div>
                         </div>
@@ -224,13 +227,14 @@
                 </section>
                 <script>const portionDescriptions = {{ portion_info | tojson }};</script>
 
-                <!-- Weekly Stats -->
+                <!-- Last 7 Days -->
                 <section class="card stats-card">
-                    <div class="card-label">This Week</div>
+                    <div class="card-label">Last 7 Days</div>
                     {% if weekly_stats %}
                         <div class="bar-chart" style="--chart-max: {{ max_daily_cups }};">
                             {% for day in weekly_stats %}
-                                <div class="bar-column {% if day.is_today %}is-today{% endif %}">
+                                <div class="bar-column {% if day.is_today %}is-today{% endif %}"
+                                     data-date="{{ day.date }}" data-cups="{{ day.total_cups }}">
                                     <div class="bar-stack">
                                         {% if day.large > 0 %}
                                             <div class="bar-segment bar-large" style="--seg-cups: {{ day.large * 0.75 }};"></div>
@@ -242,40 +246,35 @@
                                             <div class="bar-segment bar-small" style="--seg-cups: {{ day.small * 0.25 }};"></div>
                                         {% endif %}
                                     </div>
+                                    {% if day.manual_count > 0 %}
+                                        <div class="bar-manual-dot" title="{{ day.manual_count }} manual">●</div>
+                                    {% endif %}
                                     <div class="bar-label">{{ day.day_label }}</div>
+                                    <div class="bar-cups">{{ day.total_cups }}</div>
                                 </div>
                             {% endfor %}
                         </div>
+                        <div class="day-detail-panel" id="day-detail" style="display:none;"></div>
+                        <div class="stats-footer">
+                            {% if week_summary %}
+                                <span class="week-summary">{{ week_summary }}</span>
+                            {% endif %}
+                            {% if consumption %}
+                                <span class="consumption-rate" title="Estimated from last 7 days">
+                                    <span class="rate-toggle">
+                                        <button class="rate-btn" data-period="daily">D</button>
+                                        <button class="rate-btn active" data-period="weekly">W</button>
+                                        <button class="rate-btn" data-period="monthly">M</button>
+                                    </span>
+                                    <span class="rate-value" id="rate-value">{{ consumption.weekly_cups }} cups ({{ consumption.weekly_lbs }} lbs)</span>
+                                </span>
+                                <script>
+                                    window._consumption = {{ consumption | tojson }};
+                                </script>
+                            {% endif %}
+                        </div>
                     {% else %}
                         <p class="empty-state">No feeding data yet</p>
-                    {% endif %}
-                </section>
-
-                <!-- Recent Activity -->
-                <section class="card activity-card">
-                    <div class="card-label">Recent Activity</div>
-                    {% if recent_activity %}
-                        <details class="activity-details">
-                            <summary class="activity-summary">View feeding log</summary>
-                            <div class="activity-groups">
-                                {% for date_label, events in recent_activity|groupby('date') %}
-                                    <div class="activity-group">
-                                        <div class="activity-date-header">{{ date_label }}</div>
-                                        <ul class="activity-list">
-                                            {% for event in events %}
-                                                <li class="activity-item">
-                                                    <span class="activity-time">{{ event.time }}</span>
-                                                    <span class="activity-portion portion-{{ event.portion }}">{{ event.portion }}</span>
-                                                    <span class="activity-type">{{ event.type }}</span>
-                                                </li>
-                                            {% endfor %}
-                                        </ul>
-                                    </div>
-                                {% endfor %}
-                            </div>
-                        </details>
-                    {% else %}
-                        <p class="empty-state">No recent activity</p>
                     {% endif %}
                 </section>
             </div>
@@ -295,21 +294,6 @@
         </footer>
 
         <div id="toast-container" aria-live="polite"></div>
-        <script>
-            (function() {
-              var p = new URLSearchParams(window.location.search);
-              if (p.has('from') && p.get('from') === 'dashboard') {
-                localStorage.setItem('glenwood-dashboard', '1');
-                p.delete('from');
-                var clean = window.location.pathname + (p.toString() ? '?' + p : '') + window.location.hash;
-                history.replaceState(null, '', clean);
-              }
-              if (localStorage.getItem('glenwood-dashboard')) {
-                var el = document.getElementById('dashboard-link');
-                if (el) el.style.display = '';
-              }
-            })();
-        </script>
         <script src="{{ url_for('static', filename='main.js') }}"></script>
     </body>
 </html>

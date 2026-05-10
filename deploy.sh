@@ -4,8 +4,8 @@
 
 set -e  # Exit on error
 
-PI_HOST="${PI_HOST:-pi@petfeedr.local}"
-PI_PATH="${PI_PATH:-/home/pi/PetFeedr}"
+PI_HOST="${PI_HOST:-jason@petfeedr}"
+PI_PATH="${PI_PATH:-/home/jason/PetFeedr}"
 LOCAL_PATH="$(cd "$(dirname "$0")" && pwd)"  # Get absolute path
 BACKUP_DIR="${BACKUP_DIR:-$HOME/PetFeedr-backups}"
 
@@ -52,13 +52,21 @@ echo "📦 Syncing files to Pi..."
 rsync -avz --delete \
     -e "ssh $SSH_OPTS" \
     --exclude 'venv/' \
+    --exclude '.venv/' \
     --exclude '__pycache__/' \
     --exclude '*.pyc' \
     --exclude '.git/' \
     --exclude 'feeding_log.txt' \
+    --exclude 'feeding_log.txt.*' \
     --exclude 'feeding_schedules.txt' \
     --exclude 'settings.json' \
     --exclude 'todays_schedule.json' \
+    --exclude 'node_modules/' \
+    --exclude '.astro/' \
+    --exclude '.claude/' \
+    --exclude '.github/' \
+    --exclude 'data/' \
+    --exclude 'CLAUDE.md' \
     "$LOCAL_PATH/" "$PI_HOST:$PI_PATH/"
 
 # Check if venv exists, create if not
@@ -78,5 +86,5 @@ echo "✅ Checking service status..."
 ssh $SSH_OPTS "$PI_HOST" "sudo systemctl is-active petfeedr.service" && echo "🐱 PetFeedr is running!" || echo "❌ Service failed to start"
 
 echo ""
-echo "🌐 Web interface: http://petfeedr.local:5000"
+echo "🌐 Web interface: http://petfeedr:5000"
 echo "📋 View logs: ssh $PI_HOST 'sudo journalctl -u petfeedr.service -f'"

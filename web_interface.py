@@ -289,22 +289,64 @@ def parse_weekly_stats():
             'day_label': d.strftime('%a'),
             'is_today': d == today,
             'small': 0, 'medium': 0, 'large': 0,
-            'total_cups': 0.0
+            'total_cups': 0.0,
+            'manual_count': 0,
+            'total_feedings': 0
         }
 
     cups_map = {'small': 0.25, 'medium': 0.50, 'large': 0.75}
     manual_pat = re.compile(r'^(\d{4}-\d{2}-\d{2}) \d{2}:\d{2}:\d{2} - Manual feeding triggered \((\w+) portion\)')
     sched_pat = re.compile(r'^(\d{4}-\d{2}-\d{2}) \d{2}:\d{2}:\d{2} - Feeding at .* \((\w+) portion\)')
+    # Python logging format: "2026-05-10 04:00:00,391 - INFO - Feeding completed in 0.31s (small portion)"
+    completed_pat = re.compile(r'^(\d{4}-\d{2}-\d{2}) \d{2}:\d{2}:\d{2},\d+ - INFO - Feeding completed in [\d.]+s \((\w+) portion\)')
 
     for line in lines:
-        match = manual_pat.match(line.strip()) or sched_pat.match(line.strip())
+        stripped = line.strip()
+        manual_match = manual_pat.match(stripped)
+        sched_match = sched_pat.match(stripped) or completed_pat.match(stripped)
+        match = manual_match or sched_match
         if match:
             date_str, portion = match.groups()
             if date_str in stats and portion in cups_map:
                 stats[date_str][portion] += 1
                 stats[date_str]['total_cups'] += cups_map[portion]
+                stats[date_str]['total_feedings'] += 1
+                if manual_match:
+                    stats[date_str]['manual_count'] += 1
 
     return list(stats.values())
+
+
+def build_week_summary(weekly_stats):
+    """Build a one-line summary of the week's feeding activity."""
+    total_manual = sum(d['manual_count'] for d in weekly_stats)
+    total_feedings = sum(d['total_feedings'] for d in weekly_stats)
+    if total_feedings == 0:
+        return None
+    if total_manual == 0:
+        return "All feedings on schedule"
+    manual_label = "1 manual feed" if total_manual == 1 else f"{total_manual} manual feeds"
+    return f"{manual_label} this week"
+
+
+def calculate_consumption_rate(weekly_stats):
+    """Calculate consumption rate from weekly data."""
+    total_cups = sum(d['total_cups'] for d in weekly_stats)
+    days_with_data = sum(1 for d in weekly_stats if d['total_feedings'] > 0)
+    if days_with_data == 0:
+        return None
+    daily_avg = total_cups / days_with_data
+    weekly_avg = daily_avg * 7
+    monthly_avg = daily_avg * 30
+    lbs_per_cup = 0.25  # ~4 oz dry kibble per cup, 16 oz per lb
+    return {
+        'daily_cups': round(daily_avg, 2),
+        'daily_lbs': round(daily_avg * lbs_per_cup, 2),
+        'weekly_cups': round(weekly_avg, 1),
+        'weekly_lbs': round(weekly_avg * lbs_per_cup, 1),
+        'monthly_cups': round(monthly_avg, 1),
+        'monthly_lbs': round(monthly_avg * lbs_per_cup, 1),
+    }
 
 
 # Configure logging
@@ -325,7 +367,7 @@ def index():
     
     daily_total = calculate_daily_total(schedules)
     next_feeding = get_next_feeding(schedules)
-    recent_activity = parse_recent_activity(days=14, limit=30)
+    recent_activity = parse_recent_activity(days=1, limit=1)
     all_fed_today = bool(schedules) and all(s.get('is_past') for s in schedules)
     last_feeding = recent_activity[0] if recent_activity else None
 
@@ -343,23 +385,25 @@ def index():
 
     timeline_hours = []
     first_hour = ((timeline_start // 60) + 1) * 60
-    for mins in range(first_hour, timeline_end, 120):
+    for mins in range(first_hour, timeline_end, 60):
         h = mins // 60
-        label = f"{h % 12 or 12}{'AM' if h < 12 else 'PM'}"
         pct = ((mins - timeline_start) / (timeline_end - timeline_start)) * 100
+        show_label = (h % 2 == 0)
+        label = f"{h % 12 or 12}{'AM' if h < 12 else 'PM'}" if show_label else None
         timeline_hours.append({'label': label, 'pct': pct})
 
     # Weekly stats
     weekly_stats = parse_weekly_stats()
     max_daily_cups = max((d['total_cups'] for d in weekly_stats), default=0.5)
     max_daily_cups = max(max_daily_cups, 0.5)
+    week_summary = build_week_summary(weekly_stats)
+    consumption = calculate_consumption_rate(weekly_stats)
 
     portion_info = {name: desc for name, (cycles, desc) in PORTION_SIZES.items()}
 
     return render_template('index.html',
                            schedules=schedules,
                            next_feeding=next_feeding,
-                           recent_activity=recent_activity,
                            portion_sizes=PORTION_SIZES,
                            portion_info=portion_info,
                            default_portion=DEFAULT_PORTION,
@@ -372,7 +416,51 @@ def index():
                            timeline_end=timeline_end,
                            timeline_hours=timeline_hours,
                            weekly_stats=weekly_stats,
-                           max_daily_cups=max_daily_cups)
+                           max_daily_cups=max_daily_cups,
+                           week_summary=week_summary,
+                           consumption=consumption)
+
+
+@app.route('/api/day-detail/<date_str>')
+def day_detail(date_str):
+    """Return feeding details for a specific date (YYYY-MM-DD)."""
+    try:
+        target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        return jsonify({'success': False, 'error': 'Invalid date format'}), 400
+
+    lines = read_all_log_lines()
+    cups_map = {'small': 0.25, 'medium': 0.50, 'large': 0.75}
+    manual_pat = re.compile(r'^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}) - Manual feeding triggered \((\w+) portion\)')
+    completed_pat = re.compile(r'^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}),\d+ - INFO - Feeding completed in [\d.]+s \((\w+) portion\)')
+
+    feedings = []
+    for line in lines:
+        stripped = line.strip()
+        manual_match = manual_pat.match(stripped)
+        completed_match = completed_pat.match(stripped)
+        match = manual_match or completed_match
+        if match:
+            d, t, portion = match.groups()
+            if d == date_str and portion in cups_map:
+                h, m, s = t.split(':')
+                hour = int(h)
+                time_12h = f"{hour % 12 or 12}:{m} {'AM' if hour < 12 else 'PM'}"
+                feedings.append({
+                    'time': time_12h,
+                    'portion': portion,
+                    'cups': cups_map[portion],
+                    'type': 'manual' if manual_match else 'scheduled'
+                })
+
+    total_cups = sum(f['cups'] for f in feedings)
+    return jsonify({
+        'success': True,
+        'date': date_str,
+        'feedings': feedings,
+        'total_cups': total_cups,
+        'total_feedings': len(feedings)
+    })
 
 
 @app.route('/add', methods=['POST'])

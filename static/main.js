@@ -54,11 +54,89 @@ function initTimeline() {
     });
 }
 
+// ===== Consumption Rate Toggle =====
+function initRateToggle() {
+    const btns = document.querySelectorAll('.rate-btn');
+    const value = document.getElementById('rate-value');
+    if (!btns.length || !value || !window._consumption) return;
+
+    const c = window._consumption;
+    const labels = {
+        daily: `${c.daily_cups} cups (${c.daily_lbs} lbs)`,
+        weekly: `${c.weekly_cups} cups (${c.weekly_lbs} lbs)`,
+        monthly: `${c.monthly_cups} cups (${c.monthly_lbs} lbs)`
+    };
+
+    btns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            btns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            value.textContent = labels[btn.dataset.period];
+        });
+    });
+}
+
+// ===== Bar Chart Day Detail =====
+function initBarChart() {
+    const columns = document.querySelectorAll('.bar-column[data-date]');
+    const panel = document.getElementById('day-detail');
+    if (!columns.length || !panel) return;
+
+    columns.forEach(col => {
+        col.addEventListener('click', async () => {
+            const date = col.dataset.date;
+            const wasSelected = col.classList.contains('selected');
+
+            columns.forEach(c => c.classList.remove('selected'));
+
+            if (wasSelected) {
+                panel.style.display = 'none';
+                return;
+            }
+
+            col.classList.add('selected');
+            panel.style.display = '';
+            panel.innerHTML = '<div style="text-align:center;color:var(--color-text-muted);">Loading...</div>';
+
+            try {
+                const resp = await fetch(`/api/day-detail/${date}`);
+                const data = await resp.json();
+                if (!data.success || data.feedings.length === 0) {
+                    panel.innerHTML = '<div style="text-align:center;color:var(--color-text-muted);">No feedings recorded</div>';
+                    return;
+                }
+
+                const dateObj = new Date(date + 'T12:00:00');
+                const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+
+                let html = `<div class="day-detail-header">
+                    <span>${dayName}</span>
+                    <span class="day-detail-total">${data.total_cups} cups &middot; ${data.total_feedings} feedings</span>
+                </div><ul class="day-detail-list">`;
+
+                for (const f of data.feedings) {
+                    html += `<li class="day-detail-item">
+                        <span class="day-detail-time">${f.time}</span>
+                        <span class="day-detail-portion portion-${f.portion}" title="${f.cups} cups">${f.portion}<span class="detail-cups">${f.cups} cup${f.cups !== 1 ? 's' : ''}</span></span>
+                        <span class="day-detail-type">${f.type}</span>
+                    </li>`;
+                }
+                html += '</ul>';
+                panel.innerHTML = html;
+            } catch {
+                panel.innerHTML = '<div style="text-align:center;color:var(--color-text-muted);">Failed to load</div>';
+            }
+        });
+    });
+}
+
 // Update icon and init features once DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     updateThemeIcon(document.documentElement.getAttribute('data-theme') || 'light');
     initCountdown();
     initTimeline();
+    initBarChart();
+    initRateToggle();
     initAjaxForms();
 
     // Register service worker for PWA
