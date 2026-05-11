@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
     <head>
         <title>PetFeedr</title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -15,14 +15,24 @@
     </head>
     <body>
         <!-- Settings Sidebar -->
-        <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
-        <aside class="sidebar">
+        <div class="sidebar-overlay" onclick="toggleSidebar()" aria-hidden="true"></div>
+        <aside class="sidebar" role="dialog" aria-label="Settings">
             <div class="sidebar-header">
                 <h2>Settings</h2>
-                <button class="sidebar-close" onclick="toggleSidebar()">×</button>
+                <button class="sidebar-close" onclick="toggleSidebar()" aria-label="Close settings">×</button>
             </div>
             
             <div class="sidebar-content">
+                <!-- Appearance -->
+                <section class="sidebar-section">
+                    <h3>Appearance</h3>
+                    <div class="theme-picker" role="radiogroup" aria-label="Color theme">
+                        <button class="theme-opt" data-mode="auto" role="radio" aria-checked="true" aria-label="Auto theme">Auto</button>
+                        <button class="theme-opt" data-mode="light" role="radio" aria-checked="false" aria-label="Light theme">Light</button>
+                        <button class="theme-opt" data-mode="dark" role="radio" aria-checked="false" aria-label="Dark theme">Dark</button>
+                    </div>
+                </section>
+
                 <!-- Add New Feeding -->
                 <section class="sidebar-section">
                     <h3>Add Feeding Time</h3>
@@ -66,7 +76,7 @@
                                     <div class="edit-schedule-actions">
                                         <form action="/update_portion" method="post" class="inline-form">
                                             <input type="hidden" name="base_time" value="{{ sched.base_time_24h }}">
-                                            <select name="portion" class="portion-mini">
+                                            <select name="portion" class="portion-mini" aria-label="Change portion for {{ sched.actual_time_12h }}">
                                                 {% for name, (cycles, desc) in portion_sizes.items() %}
                                                     <option value="{{ name }}" {% if sched.portion == name %}selected{% endif %}>{{ name | capitalize }}</option>
                                                 {% endfor %}
@@ -74,13 +84,13 @@
                                         </form>
                                         <form action="/toggle_fixed" method="post" class="inline-form">
                                             <input type="hidden" name="base_time" value="{{ sched.base_time_24h }}">
-                                            <button type="submit" class="btn-icon" title="{% if sched.is_fixed %}Unlock{% else %}Lock{% endif %}">
+                                            <button type="submit" class="btn-icon" title="{% if sched.is_fixed %}Unlock{% else %}Lock{% endif %} {{ sched.actual_time_12h }} feeding time" aria-label="{% if sched.is_fixed %}Unlock{% else %}Lock{% endif %} {{ sched.actual_time_12h }} feeding time">
                                                 {% if sched.is_fixed %}🔓{% else %}🔒{% endif %}
                                             </button>
                                         </form>
                                         <form action="/delete" method="post" class="inline-form">
                                             <input type="hidden" name="base_time" value="{{ sched.base_time_24h }}">
-                                            <button type="submit" class="btn-icon btn-delete" title="Delete">✕</button>
+                                            <button type="submit" class="btn-icon btn-delete" title="Delete {{ sched.actual_time_12h }} feeding" aria-label="Delete {{ sched.actual_time_12h }} feeding">✕</button>
                                         </form>
                                     </div>
                                 </li>
@@ -90,28 +100,21 @@
                         <p class="empty-state">No scheduled feedings yet</p>
                     {% endif %}
                 </section>
-                
+
+
             </div>
         </aside>
 
         <!-- Main Dashboard -->
         <main class="dashboard">
             <header class="dashboard-header">
-                <div class="header-brand">
-                    <img src="{{ url_for('static', filename='logo.svg') }}" alt="PetFeedr" class="header-logo">
-                    <h1><span class="pet">Pet</span><span class="feedr">Feedr</span></h1>
-                </div>
-                <div class="dashboard-header-actions">
-                    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode" aria-label="Toggle dark mode">
-                        <span class="theme-icon"></span>
-                    </button>
-                    <button class="settings-toggle" onclick="toggleSidebar()" title="Settings">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="3"></circle>
-                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-                        </svg>
-                    </button>
-                </div>
+                <h1><span class="pet">Pet</span><span class="feedr">Feedr</span></h1>
+                <button class="settings-toggle" onclick="toggleSidebar()" title="Settings" aria-label="Open settings">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                </button>
             </header>
 
             <div class="dashboard-content">
@@ -154,12 +157,14 @@
                     {% if schedules %}
                         <div class="timeline" data-start="{{ timeline_start }}" data-end="{{ timeline_end }}">
                             <div class="timeline-bar">
-                                <div class="timeline-now" id="timeline-now"></div>
+                                <div class="timeline-now" id="timeline-now" aria-hidden="true"></div>
                                 {% for sched in schedules %}
                                     {% set range = timeline_end - timeline_start %}
                                     {% set pct = ((sched.time_minutes - timeline_start) / range * 100) if range > 0 else 50 %}
                                     <div class="timeline-dot {% if sched.is_past %}is-past{% endif %} {% if sched.is_next %}is-next{% endif %} portion-{{ sched.portion }}"
-                                         style="--dot-pos: {{ pct }}%;">
+                                         style="--dot-pos: {{ pct }}%;"
+                                         role="button" tabindex="0"
+                                         aria-label="{{ sched.actual_time_12h }}, {{ sched.portion }} portion{% if sched.is_past %}, completed{% endif %}{% if sched.is_next %}, next feeding{% endif %}">
                                         <div class="timeline-tooltip">
                                             {{ sched.actual_time_12h }}<br>
                                             <span class="portion-{{ sched.portion }}">{{ sched.portion }}</span>
@@ -208,10 +213,9 @@
 
                 <!-- Manual Feed -->
                 <section class="card feed-card">
-                    <div class="card-label">Manual Feed</div>
                     <form action="/feed" method="post" class="feed-form">
-                        <button type="submit" class="feed-circle-btn">
-                            <span class="feed-circle-icon">🐱</span>
+                        <button type="submit" class="feed-circle-btn" aria-label="Dispense food now">
+                            <span class="feed-circle-label" aria-hidden="true">Feed</span>
                         </button>
                         <div class="portion-segmented">
                             {% for name, (cycles, desc) in portion_sizes.items() %}
@@ -234,8 +238,10 @@
                         <div class="bar-chart" style="--chart-max: {{ max_daily_cups }};">
                             {% for day in weekly_stats %}
                                 <div class="bar-column {% if day.is_today %}is-today{% endif %}"
-                                     data-date="{{ day.date }}" data-cups="{{ day.total_cups }}">
-                                    <div class="bar-stack">
+                                     data-date="{{ day.date }}" data-cups="{{ day.total_cups }}"
+                                     role="button" tabindex="0"
+                                     aria-label="{{ day.day_label }}, {{ day.total_cups }} cups, {{ day.total_feedings }} feedings">
+                                    <div class="bar-stack" style="--col-ratio: {{ (day.total_cups / max_daily_cups) if max_daily_cups > 0 else 0 }};">
                                         {% if day.large > 0 %}
                                             <div class="bar-segment bar-large" style="--seg-cups: {{ day.large * 0.75 }};"></div>
                                         {% endif %}
@@ -254,17 +260,17 @@
                                 </div>
                             {% endfor %}
                         </div>
-                        <div class="day-detail-panel" id="day-detail" style="display:none;"></div>
+                        <div class="day-detail-panel" id="day-detail" style="display:none;" aria-live="polite"></div>
                         <div class="stats-footer">
                             {% if week_summary %}
                                 <span class="week-summary">{{ week_summary }}</span>
                             {% endif %}
                             {% if consumption %}
                                 <span class="consumption-rate" title="Estimated from last 7 days">
-                                    <span class="rate-toggle">
-                                        <button class="rate-btn" data-period="daily">D</button>
-                                        <button class="rate-btn active" data-period="weekly">W</button>
-                                        <button class="rate-btn" data-period="monthly">M</button>
+                                    <span class="rate-toggle" role="radiogroup" aria-label="Consumption period">
+                                        <button class="rate-btn" data-period="daily" role="radio" aria-checked="false" aria-label="Daily">D</button>
+                                        <button class="rate-btn active" data-period="weekly" role="radio" aria-checked="true" aria-label="Weekly">W</button>
+                                        <button class="rate-btn" data-period="monthly" role="radio" aria-checked="false" aria-label="Monthly">M</button>
                                     </span>
                                     <span class="rate-value" id="rate-value">{{ consumption.weekly_cups }} cups ({{ consumption.weekly_lbs }} lbs)</span>
                                 </span>
@@ -279,9 +285,7 @@
                 </section>
             </div>
 
-        </main>
-
-        <footer class="status-footer">
+            <footer class="status-footer">
             <span class="footer-item">v{{ app_version }}</span>
             <span class="footer-divider">·</span>
             <span class="footer-item {% if simulation_mode %}footer-sim{% endif %}">
@@ -291,7 +295,8 @@
                 <span class="footer-divider">·</span>
                 <span class="footer-item">Last fed: {{ last_feeding.date }} at {{ last_feeding.time }}</span>
             {% endif %}
-        </footer>
+            </footer>
+        </main>
 
         <div id="toast-container" aria-live="polite"></div>
         <script src="{{ url_for('static', filename='main.js') }}"></script>

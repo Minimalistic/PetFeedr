@@ -1,12 +1,12 @@
 /* ===== CSS Variables ===== */
 :root {
-    --color-bg: #faf8f5;
-    --color-bg-warm: #f5f0e8;
+    --color-bg: #f0f4f4;
+    --color-bg-warm: #e8eded;
     --color-surface: #ffffff;
-    --color-text: #2d3436;
-    --color-text-muted: #636e72;
+    --color-text: #1a2e30;
+    --color-text-muted: #4a6466;
     --color-primary: #00838f;
-    --color-primary-dark: #006064;
+    --color-primary-dark: #005f66;
     --color-accent: #f08080;
     --color-accent-dark: #e06666;
     --color-success: #27ae60;
@@ -22,7 +22,7 @@
     --radius-lg: 20px;
     
     --sidebar-width: 340px;
-    --card-padding: clamp(1rem, 2.5vw, 1.5rem);
+    --card-padding: clamp(0.75rem, 1.5vw, 1.25rem);
 
     --color-border: rgba(0,0,0,0.08);
     --color-border-light: rgba(0,0,0,0.05);
@@ -39,11 +39,11 @@
 
 /* ===== Dark Mode ===== */
 [data-theme="dark"] {
-    --color-bg: #1a1a2e;
-    --color-bg-warm: #16213e;
-    --color-surface: #222244;
-    --color-text: #e0e0e0;
-    --color-text-muted: #a0a0b0;
+    --color-bg: #0d2224;
+    --color-bg-warm: #0a1c1e;
+    --color-surface: #142e31;
+    --color-text: #e0e8e8;
+    --color-text-muted: #8aa0a2;
     --color-primary: #00acc1;
     --color-primary-dark: #00838f;
     --color-accent: #f08080;
@@ -53,7 +53,7 @@
     --color-danger: #e74c3c;
     --color-border: rgba(255,255,255,0.1);
     --color-border-light: rgba(255,255,255,0.06);
-    --color-input-bg: #2a2a4a;
+    --color-input-bg: #1a3538;
     --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
     --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
     --shadow-lg: 0 8px 30px rgba(0,0,0,0.5);
@@ -67,6 +67,24 @@
     padding: 0;
 }
 
+/* Keyboard focus indicator */
+:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+/* Skip link for screen readers */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
+}
+
 html {
     font-size: 16px;
 }
@@ -76,7 +94,9 @@ body {
     background: linear-gradient(135deg, var(--color-bg) 0%, var(--color-bg-warm) 100%);
     background-attachment: fixed;
     color: var(--color-text);
-    min-height: 100vh;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
     line-height: 1.5;
 }
 
@@ -153,14 +173,14 @@ body {
 .sidebar-content {
     flex: 1;
     overflow-y: auto;
-    padding: 1rem;
+    padding: 0.75rem;
 }
 
 .sidebar-section {
     background: var(--color-bg);
     border-radius: var(--radius-md);
-    padding: 1.25rem;
-    margin-bottom: 1rem;
+    padding: 0.85rem;
+    margin-bottom: 0.6rem;
 }
 
 .sidebar-section.highlight,
@@ -173,15 +193,15 @@ body {
 
 .sidebar-section h3 {
     font-family: var(--font-display);
-    font-size: 1.1rem;
+    font-size: 1rem;
     font-weight: 600;
     color: var(--color-primary-dark);
-    margin-bottom: 1rem;
+    margin-bottom: 0.6rem;
 }
 
 /* ===== Forms ===== */
 .form-group {
-    margin-bottom: 1rem;
+    margin-bottom: 0.6rem;
 }
 
 .form-group label {
@@ -195,8 +215,8 @@ body {
 .form-group input,
 .form-group select {
     width: 100%;
-    padding: 0.7rem 1rem;
-    font-size: 1rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.9rem;
     font-family: inherit;
     color: var(--color-text);
     border: 2px solid var(--color-border);
@@ -275,10 +295,10 @@ body {
 }
 
 .setting-description {
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     color: var(--color-text-muted);
-    margin-bottom: 1rem;
-    line-height: 1.4;
+    margin-bottom: 0.6rem;
+    line-height: 1.3;
 }
 
 /* ===== Buttons ===== */
@@ -287,7 +307,7 @@ body {
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    padding: 0.75rem 1.5rem;
+    padding: 0.6rem 1.25rem;
     font-size: 1rem;
     font-weight: 600;
     font-family: inherit;
@@ -376,17 +396,20 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0.75rem;
+    padding: 0.4rem 0.5rem;
     background: var(--color-surface);
     border-radius: var(--radius-sm);
-    margin-bottom: 0.5rem;
-    gap: 0.5rem;
+    margin-bottom: 0.35rem;
+    gap: 0.3rem;
+    overflow: hidden;
 }
 
 .edit-schedule-info {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.4rem;
+    min-width: 0;
+    overflow: hidden;
 }
 
 .edit-time {
@@ -407,8 +430,9 @@ body {
 
 .edit-schedule-actions {
     display: flex;
-    gap: 0.25rem;
+    gap: 0.2rem;
     align-items: center;
+    flex-shrink: 0;
 }
 
 .portion-mini {
@@ -428,8 +452,12 @@ body {
 .dashboard {
     max-width: 1060px;
     margin: 0 auto;
-    padding: clamp(0.5rem, 2vw, 1.5rem) clamp(0.75rem, 3vw, 3rem);
-    min-height: 100vh;
+    padding: clamp(0.5rem, 1vw, 0.75rem) clamp(0.75rem, 3vw, 3rem);
+    height: 100vh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 
 .dashboard-back-link {
@@ -444,20 +472,8 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0.25rem 0 clamp(0.5rem, 1.5vw, 1rem);
+    padding: 0.25rem 0 clamp(0.25rem, 1vw, 0.5rem);
     gap: 0.75rem;
-}
-
-.header-brand {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.header-logo {
-    width: clamp(40px, 10vw, 56px);
-    height: clamp(40px, 10vw, 56px);
-    border-radius: 10px;
 }
 
 .dashboard-header h1 {
@@ -495,25 +511,39 @@ body {
     color: var(--color-primary);
 }
 
-.theme-toggle {
-    background: var(--color-surface);
-    border: none;
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
+.theme-picker {
     display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    box-shadow: var(--shadow-sm);
-    color: var(--color-text-muted);
-    transition: box-shadow 0.2s ease, color 0.2s ease;
-    font-size: 1.2rem;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--color-input-bg);
 }
 
-.theme-toggle:hover {
-    box-shadow: var(--shadow-md);
-    color: var(--color-warning);
+.theme-opt {
+    flex: 1;
+    background: none;
+    border: none;
+    padding: 0.5rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    font-family: var(--font-body);
+}
+
+.theme-opt + .theme-opt {
+    border-left: 1px solid var(--color-border);
+}
+
+.theme-opt.active {
+    background: var(--color-primary);
+    color: #fff;
+}
+
+.theme-opt:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: -2px;
 }
 
 .dashboard-header-actions {
@@ -524,8 +554,19 @@ body {
 
 .dashboard-content {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
-    gap: clamp(0.75rem, 2vw, 1.5rem);
+    grid-template-columns: 1fr 1fr;
+    gap: clamp(0.4rem, 1vw, 0.75rem);
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 600px) {
+    .dashboard-content {
+        grid-template-columns: 1fr;
+    }
 }
 
 /* ===== Cards ===== */
@@ -542,7 +583,7 @@ body {
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: var(--color-text-muted);
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.5rem;
 }
 
 /* Next Feeding Card */
@@ -551,7 +592,11 @@ body {
     background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
     color: white;
     text-align: center;
-    padding: clamp(1.25rem, 3vw, 2rem);
+    padding: clamp(0.75rem, 2vw, 1.5rem);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
 }
 
 .next-feeding-card .card-label {
@@ -817,26 +862,26 @@ body {
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    padding: clamp(1.25rem, 3vw, 2rem);
+    padding: clamp(0.75rem, 2vw, 1.25rem);
 }
 
 .feed-form {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 1rem;
+    gap: 0.6rem;
 }
 
 /* Circular Feed Button */
 .feed-circle-btn {
-    width: 110px;
-    height: 110px;
+    width: clamp(80px, 12vw, 100px);
+    height: clamp(80px, 12vw, 100px);
     border-radius: 50%;
     border: none;
-    background: var(--color-accent);
+    background: var(--color-primary);
     color: white;
     cursor: pointer;
-    box-shadow: 0 6px 20px rgba(240,128,128,0.35);
+    box-shadow: 0 6px 20px rgba(0,131,143,0.35);
     transition: transform 0.15s ease, box-shadow 0.15s ease;
     position: relative;
     overflow: hidden;
@@ -844,18 +889,20 @@ body {
 
 .feed-circle-btn:hover {
     transform: scale(1.05);
-    box-shadow: 0 8px 28px rgba(240,128,128,0.5);
+    box-shadow: 0 8px 28px rgba(0,131,143,0.5);
 }
 
 .feed-circle-btn:active {
     transform: scale(0.95);
-    box-shadow: 0 2px 10px rgba(240,128,128,0.3);
+    box-shadow: 0 2px 10px rgba(0,131,143,0.3);
 }
 
-.feed-circle-icon {
-    font-size: 2.5rem;
-    display: block;
-    line-height: 1;
+.feed-circle-label {
+    font-family: var(--font-display);
+    font-size: 1.4rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
 }
 
 @keyframes feedRipple {
@@ -877,7 +924,7 @@ body {
 }
 
 @keyframes feedPulse {
-    0%, 100% { box-shadow: 0 6px 20px rgba(240,128,128,0.35); }
+    0%, 100% { box-shadow: 0 6px 20px rgba(0,131,143,0.35); }
     50%      { box-shadow: 0 0 30px rgba(39,174,96,0.6); }
 }
 
@@ -903,9 +950,18 @@ body {
     font-weight: 600;
     font-size: 0.85rem;
     cursor: pointer;
-    transition: background 0.2s ease, color 0.2s ease;
+    transition: background 0.2s ease, color 0.2s ease, transform 0.15s ease;
     background: var(--color-surface);
     color: var(--color-text-muted);
+}
+
+.portion-segment-label:hover {
+    background: var(--color-border-light);
+    transform: scale(1.05);
+}
+
+.portion-segment input:checked + .portion-segment-label:hover {
+    transform: scale(1.05);
 }
 
 .portion-segment input:checked + .portion-segment-label.portion-small {
@@ -931,13 +987,17 @@ body {
 
 /* ===== Stats Card ===== */
 .stats-card {
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
 }
 
 .bar-chart {
     display: flex;
     align-items: flex-end;
     justify-content: space-around;
-    height: 150px;
+    height: clamp(80px, 12vh, 140px);
+    flex-shrink: 0;
     padding: 0 0.25rem;
     gap: 0.25rem;
 }
@@ -947,23 +1007,26 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.35rem;
+    justify-content: flex-end;
+    gap: 0.2rem;
     max-width: 48px;
+    height: 100%;
 }
 
 .bar-stack {
     display: flex;
     flex-direction: column-reverse;
+    align-items: stretch;
     width: 100%;
     border-radius: 4px 4px 0 0;
     overflow: hidden;
-    min-height: 2px;
+    height: calc(var(--col-ratio, 1) * 100%);
+    margin-top: auto;
 }
 
 .bar-segment {
     width: 100%;
-    height: calc(var(--seg-cups) / var(--chart-max) * 120px);
-    min-height: 2px;
+    flex: var(--seg-cups) 0 0px;
 }
 
 .bar-small  { background: var(--color-success); }
@@ -1020,11 +1083,12 @@ body {
 }
 
 .day-detail-panel {
-    margin-top: 0.75rem;
+    margin-top: 0.5rem;
     padding: 0.75rem;
     background: var(--color-bg);
     border-radius: var(--radius-sm);
     font-size: 0.8rem;
+    flex-shrink: 0;
     animation: slideDown 0.15s ease;
 }
 
@@ -1099,9 +1163,10 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-top: 0.75rem;
-    padding-top: 0.5rem;
+    margin-top: auto;
+    padding-top: 0.4rem;
     border-top: 1px solid var(--color-border-light);
+    flex-shrink: 0;
     font-size: 0.8rem;
     color: var(--color-text-muted);
 }
@@ -1279,20 +1344,7 @@ body {
     animation: scaleBounce 0.4s ease both;
 }
 
-/* Card hover lift — desktop only to avoid sticky hover on mobile */
-.card {
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-@media (hover: hover) {
-    .card:hover {
-        transform: translateY(-2px);
-        box-shadow: var(--shadow-md);
-    }
-    .next-feeding-card:hover {
-        box-shadow: 0 8px 25px rgba(0,131,143,0.3);
-    }
-}
+/* Hover effects — only on interactive elements, not cards */
 
 /* Respect reduced motion preference */
 @media (prefers-reduced-motion: reduce) {
@@ -1310,8 +1362,9 @@ body {
     align-items: center;
     flex-wrap: wrap;
     gap: 0.5rem;
-    padding: clamp(0.75rem, 2vw, 1.5rem);
-    margin-top: 1rem;
+    padding: clamp(0.25rem, 0.5vw, 0.5rem);
+    margin-top: auto;
+    flex-shrink: 0;
     font-size: 0.75rem;
     color: var(--color-text-muted);
 }

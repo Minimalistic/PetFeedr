@@ -1,23 +1,43 @@
 // ===== Dark Mode =====
-// Runs before DOM ready to prevent flash of wrong theme
-(function initTheme() {
-    const saved = localStorage.getItem('petfeedr-theme');
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const theme = saved || (prefersDark ? 'dark' : 'light');
-    document.documentElement.setAttribute('data-theme', theme);
-})();
+const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
 
-function toggleTheme() {
-    const html = document.documentElement;
-    const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-    html.setAttribute('data-theme', next);
-    localStorage.setItem('petfeedr-theme', next);
-    updateThemeIcon(next);
+function getEffectiveTheme(mode) {
+    if (mode === 'light' || mode === 'dark') return mode;
+    return darkQuery.matches ? 'dark' : 'light';
 }
 
-function updateThemeIcon(theme) {
-    const icon = document.querySelector('.theme-icon');
-    if (icon) icon.textContent = theme === 'dark' ? '\u2600\uFE0F' : '\uD83C\uDF19';
+function setThemeMode(mode) {
+    localStorage.setItem('petfeedr-theme', mode);
+    document.documentElement.setAttribute('data-theme', getEffectiveTheme(mode));
+    document.querySelectorAll('.theme-opt').forEach(btn => {
+        const active = btn.dataset.mode === mode;
+        btn.classList.toggle('active', active);
+        btn.setAttribute('aria-checked', active);
+    });
+}
+
+// Apply before DOM ready to prevent flash
+(function initTheme() {
+    const mode = localStorage.getItem('petfeedr-theme') || 'auto';
+    document.documentElement.setAttribute('data-theme', getEffectiveTheme(mode));
+})();
+
+// Follow system changes in auto mode
+darkQuery.addEventListener('change', () => {
+    const mode = localStorage.getItem('petfeedr-theme') || 'auto';
+    if (mode === 'auto') {
+        document.documentElement.setAttribute('data-theme', getEffectiveTheme('auto'));
+    }
+});
+
+function initThemePicker() {
+    const mode = localStorage.getItem('petfeedr-theme') || 'auto';
+    document.querySelectorAll('.theme-opt').forEach(btn => {
+        const active = btn.dataset.mode === mode;
+        btn.classList.toggle('active', active);
+        btn.setAttribute('aria-checked', active);
+        btn.addEventListener('click', () => setThemeMode(btn.dataset.mode));
+    });
 }
 
 // ===== Timeline =====
@@ -69,8 +89,12 @@ function initRateToggle() {
 
     btns.forEach(btn => {
         btn.addEventListener('click', () => {
-            btns.forEach(b => b.classList.remove('active'));
+            btns.forEach(b => {
+                b.classList.remove('active');
+                b.setAttribute('aria-checked', 'false');
+            });
             btn.classList.add('active');
+            btn.setAttribute('aria-checked', 'true');
             value.textContent = labels[btn.dataset.period];
         });
     });
@@ -132,7 +156,7 @@ function initBarChart() {
 
 // Update icon and init features once DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
-    updateThemeIcon(document.documentElement.getAttribute('data-theme') || 'light');
+    initThemePicker();
     initCountdown();
     initTimeline();
     initBarChart();
