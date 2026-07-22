@@ -8,20 +8,21 @@ import time
 from datetime import date
 from threading import Thread
 
-from feeder_core import load_and_schedule_feedings, log, setup_logging
+from feeder_core import (STATE_LOCK, ensure_today, generate_todays_schedule,
+                         resync_today, log, setup_logging)
 from DRV8825 import SIMULATION_MODE
 import web_interface
 
 
 def run():
     """Main run loop - loads schedules and runs them."""
-    log.info("Starting to load feeding times from file.")
+    log.info("Loading today's feeding schedule.")
 
     try:
-        load_and_schedule_feedings()
-        log.info("Finished loading feeding times from file.")
+        ensure_today()
+        log.info("Finished loading feeding times.")
     except Exception as e:
-        log.error(f"Error reading feeding_schedules.txt: {str(e)}")
+        log.error(f"Error loading feeding schedule: {str(e)}")
 
     log.info("Starting schedule execution.")
     last_date = date.today()
@@ -31,12 +32,15 @@ def run():
         if date.today() != last_date:
             log.info("New day detected - regenerating schedule with fresh randomization")
             try:
-                load_and_schedule_feedings()
+                with STATE_LOCK:
+                    generate_todays_schedule()
+                    resync_today()
                 last_date = date.today()
             except Exception as e:
                 log.error(f"Error regenerating schedule: {e}")
 
-        schedule.run_pending()
+        with STATE_LOCK:
+            schedule.run_pending()
         time.sleep(1)
 
 

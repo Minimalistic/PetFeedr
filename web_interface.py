@@ -2,7 +2,7 @@
 
 import os
 from feeder_core import (feed_pet, load_todays_schedule, save_todays_schedule,
-                         apply_random_offset, TODAYS_SCHEDULE_FILE, log, setup_logging)
+                         apply_random_offset, resync_today, STATE_LOCK, log, setup_logging)
 from feeding_stats import (parse_recent_activity, parse_weekly_stats, build_week_summary,
                            calculate_consumption_rate, calculate_daily_total, day_feedings)
 from servo_controller import PORTION_SIZES, DEFAULT_PORTION
@@ -219,45 +219,47 @@ def add_job():
         portion = DEFAULT_PORTION
 
     try:
-        with open('feeding_schedules.txt', 'r') as file:
-            existing_lines = file.readlines()
-        
-        for line in existing_lines:
-            line = line.strip()
-            if not line:
-                continue
-            existing_time = line.split(',')[0]
-            if existing_time == feeding_time:
-                if wants_json():
-                    return jsonify({'success': False, 'message': 'Feeding time already exists'}), 409
-                return "Feeding time already exists. <a href='/'>Go back</a>", 400
+        with STATE_LOCK:
+            with open('feeding_schedules.txt', 'r') as file:
+                existing_lines = file.readlines()
 
-        # Write the feeding time
-        with open('feeding_schedules.txt', 'a') as file:
+            for line in existing_lines:
+                line = line.strip()
+                if not line:
+                    continue
+                existing_time = line.split(',')[0]
+                if existing_time == feeding_time:
+                    if wants_json():
+                        return jsonify({'success': False, 'message': 'Feeding time already exists'}), 409
+                    return "Feeding time already exists. <a href='/'>Go back</a>", 400
+
+            # Write the feeding time
+            with open('feeding_schedules.txt', 'a') as file:
+                if is_fixed:
+                    file.write(f"{feeding_time},{portion},fixed\n")
+                else:
+                    file.write(f"{feeding_time},{portion}\n")
+                file.flush()
+
+            # Also add to today's schedule with randomization applied
+            todays_schedule = load_todays_schedule() or []
+            existing_times = [datetime.strptime(s['actual_time'], "%H:%M") for s in todays_schedule]
+
             if is_fixed:
-                file.write(f"{feeding_time},{portion},fixed\n")
+                actual_time = feeding_time
             else:
-                file.write(f"{feeding_time},{portion}\n")
-            file.flush()
+                # Apply randomization (±30 minutes)
+                actual_time = apply_random_offset(feeding_time, 30, existing_times)
 
-        # Also add to today's schedule with randomization applied
-        todays_schedule = load_todays_schedule() or []
-        existing_times = [datetime.strptime(s['actual_time'], "%H:%M") for s in todays_schedule]
-        
-        if is_fixed:
-            actual_time = feeding_time
-        else:
-            # Apply randomization (±30 minutes)
-            actual_time = apply_random_offset(feeding_time, 30, existing_times)
-        
-        todays_schedule.append({
-            'base_time': feeding_time,
-            'actual_time': actual_time,
-            'portion': portion,
-            'is_fixed': is_fixed,
-            'randomized': actual_time != feeding_time
-        })
-        save_todays_schedule(todays_schedule)
+            todays_schedule.append({
+                'base_time': feeding_time,
+                'actual_time': actual_time,
+                'portion': portion,
+                'is_fixed': is_fixed,
+                'randomized': actual_time != feeding_time
+            })
+            save_todays_schedule(todays_schedule)
+            resync_today()
 
         feeding_time_12h = datetime.strptime(feeding_time, "%H:%M").strftime("%I:%M %p")
         actual_time_12h = datetime.strptime(actual_time, "%H:%M").strftime("%I:%M %p")
@@ -282,18 +284,20 @@ def add_job():
 def delete_job():
     base_time = request.form['base_time']
     try:
-        with open('feeding_schedules.txt', 'r') as file:
-            lines = file.readlines()
-        with open('feeding_schedules.txt', 'w') as file:
-            for line in lines:
-                line_time = line.strip().split(',')[0]
-                if line_time != base_time:
-                    file.write(line)
+        with STATE_LOCK:
+            with open('feeding_schedules.txt', 'r') as file:
+                lines = file.readlines()
+            with open('feeding_schedules.txt', 'w') as file:
+                for line in lines:
+                    line_time = line.strip().split(',')[0]
+                    if line_time != base_time:
+                        file.write(line)
 
-        # Also remove from today's schedule
-        todays_schedule = load_todays_schedule() or []
-        todays_schedule = [s for s in todays_schedule if s['base_time'] != base_time]
-        save_todays_schedule(todays_schedule)
+            # Also remove from today's schedule
+            todays_schedule = load_todays_schedule() or []
+            todays_schedule = [s for s in todays_schedule if s['base_time'] != base_time]
+            save_todays_schedule(todays_schedule)
+            resync_today()
 
         log.info(f"Deleted feeding time: {base_time}")
         if wants_json():
@@ -311,56 +315,58 @@ def toggle_fixed():
     """Toggle the fixed status of a feeding time."""
     base_time = request.form['base_time']
     try:
-        with open('feeding_schedules.txt', 'r') as file:
-            lines = file.readlines()
-        
-        new_lines = []
-        new_is_fixed = None
-        portion = DEFAULT_PORTION
-        
-        for line in lines:
-            parts = line.strip().split(',')
-            if parts[0] == base_time:
-                time_str = parts[0]
-                portion = parts[1] if len(parts) > 1 and parts[1] not in ['fixed'] else DEFAULT_PORTION
-                is_fixed = len(parts) > 2 and parts[2].lower() == 'fixed'
-                
-                # Toggle fixed status
-                if is_fixed:
-                    new_lines.append(f"{time_str},{portion}\n")
-                    new_is_fixed = False
+        with STATE_LOCK:
+            with open('feeding_schedules.txt', 'r') as file:
+                lines = file.readlines()
+
+            new_lines = []
+            new_is_fixed = None
+            portion = DEFAULT_PORTION
+
+            for line in lines:
+                parts = line.strip().split(',')
+                if parts[0] == base_time:
+                    time_str = parts[0]
+                    portion = parts[1] if len(parts) > 1 and parts[1] not in ['fixed'] else DEFAULT_PORTION
+                    is_fixed = len(parts) > 2 and parts[2].lower() == 'fixed'
+
+                    # Toggle fixed status
+                    if is_fixed:
+                        new_lines.append(f"{time_str},{portion}\n")
+                        new_is_fixed = False
+                    else:
+                        new_lines.append(f"{time_str},{portion},fixed\n")
+                        new_is_fixed = True
                 else:
-                    new_lines.append(f"{time_str},{portion},fixed\n")
-                    new_is_fixed = True
-            else:
-                new_lines.append(line if line.endswith('\n') else line + '\n')
-        
-        with open('feeding_schedules.txt', 'w') as file:
-            file.writelines(new_lines)
-        
-        # Update today's schedule
-        if new_is_fixed is not None:
-            todays_schedule = load_todays_schedule() or []
-            existing_times = [datetime.strptime(s['actual_time'], "%H:%M") 
-                           for s in todays_schedule if s['base_time'] != base_time]
-            
-            # Remove old entry
-            todays_schedule = [s for s in todays_schedule if s['base_time'] != base_time]
-            
-            # Add updated entry
-            if new_is_fixed:
-                actual_time = base_time
-            else:
-                actual_time = apply_random_offset(base_time, 30, existing_times)
-            
-            todays_schedule.append({
-                'base_time': base_time,
-                'actual_time': actual_time,
-                'portion': portion,
-                'is_fixed': new_is_fixed,
-                'randomized': actual_time != base_time
-            })
-            save_todays_schedule(todays_schedule)
+                    new_lines.append(line if line.endswith('\n') else line + '\n')
+
+            with open('feeding_schedules.txt', 'w') as file:
+                file.writelines(new_lines)
+
+            # Update today's schedule
+            if new_is_fixed is not None:
+                todays_schedule = load_todays_schedule() or []
+                existing_times = [datetime.strptime(s['actual_time'], "%H:%M")
+                                  for s in todays_schedule if s['base_time'] != base_time]
+
+                # Remove old entry
+                todays_schedule = [s for s in todays_schedule if s['base_time'] != base_time]
+
+                # Add updated entry
+                if new_is_fixed:
+                    actual_time = base_time
+                else:
+                    actual_time = apply_random_offset(base_time, 30, existing_times)
+
+                todays_schedule.append({
+                    'base_time': base_time,
+                    'actual_time': actual_time,
+                    'portion': portion,
+                    'is_fixed': new_is_fixed,
+                    'randomized': actual_time != base_time
+                })
+                save_todays_schedule(todays_schedule)
+                resync_today()
 
         status = 'fixed' if new_is_fixed else 'randomized'
         if wants_json():
@@ -383,26 +389,36 @@ def update_portion():
         new_portion = DEFAULT_PORTION
     
     try:
-        with open('feeding_schedules.txt', 'r') as file:
-            lines = file.readlines()
-        
-        new_lines = []
-        for line in lines:
-            parts = line.strip().split(',')
-            if parts[0] == base_time:
-                time_str = parts[0]
-                is_fixed = len(parts) > 2 and parts[2].lower() == 'fixed'
-                
-                if is_fixed:
-                    new_lines.append(f"{time_str},{new_portion},fixed\n")
+        with STATE_LOCK:
+            with open('feeding_schedules.txt', 'r') as file:
+                lines = file.readlines()
+
+            new_lines = []
+            for line in lines:
+                parts = line.strip().split(',')
+                if parts[0] == base_time:
+                    time_str = parts[0]
+                    is_fixed = len(parts) > 2 and parts[2].lower() == 'fixed'
+
+                    if is_fixed:
+                        new_lines.append(f"{time_str},{new_portion},fixed\n")
+                    else:
+                        new_lines.append(f"{time_str},{new_portion}\n")
                 else:
-                    new_lines.append(f"{time_str},{new_portion}\n")
-            else:
-                new_lines.append(line if line.endswith('\n') else line + '\n')
-        
-        with open('feeding_schedules.txt', 'w') as file:
-            file.writelines(new_lines)
-        
+                    new_lines.append(line if line.endswith('\n') else line + '\n')
+
+            with open('feeding_schedules.txt', 'w') as file:
+                file.writelines(new_lines)
+
+            # Keep today's schedule in step so the already-registered job
+            # dispenses the new portion today, not tomorrow
+            todays_schedule = load_todays_schedule() or []
+            for entry in todays_schedule:
+                if entry['base_time'] == base_time:
+                    entry['portion'] = new_portion
+            save_todays_schedule(todays_schedule)
+            resync_today()
+
         log.info(f"Updated portion for {base_time} to {new_portion}")
         if wants_json():
             return jsonify({'success': True, 'message': f'Portion updated to {new_portion}'})

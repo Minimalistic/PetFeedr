@@ -10,9 +10,16 @@ import random
 import json
 import schedule
 import logging
+import threading
 from logging.handlers import TimedRotatingFileHandler
 from datetime import datetime, timedelta, date
 from servo_controller import trigger_servo, PORTION_SIZES, DEFAULT_PORTION
+
+# One lock for everything that touches the schedule files, the job registry,
+# or the motor. The `schedule` library has no thread safety of its own, and
+# Flask request threads mutate state while the main loop runs jobs. RLock:
+# resync_today() runs pending jobs, and feed_pet re-acquires under it.
+STATE_LOCK = threading.RLock()
 
 # App logger: owns feeding_log.txt. propagate=False keeps werkzeug/root
 # noise out of the feed log; root still gets a console handler so HTTP
@@ -54,15 +61,20 @@ TODAYS_SCHEDULE_FILE = 'todays_schedule.json'
 
 
 def feed_pet(portion=DEFAULT_PORTION):
-    """Feed the pet with the specified portion size."""
-    try:
-        trigger_servo(portion=portion)
-        log.info("Triggering Servo to feed the pet")
-        log.info(" > ^ <")
-        log.info("( o.o ) Food dispensed successfully!")
-        log.info(" /\\_/\\💕")
-    except Exception as e:
-        log.error(f"Error feeding pet: {str(e)}")
+    """Feed the pet with the specified portion size.
+
+    Locked so a manual feed (Flask thread) can never drive the motor
+    concurrently with a scheduled feed (main thread).
+    """
+    with STATE_LOCK:
+        try:
+            trigger_servo(portion=portion)
+            log.info("Triggering Servo to feed the pet")
+            log.info(" > ^ <")
+            log.info("( o.o ) Food dispensed successfully!")
+            log.info(" /\\_/\\💕")
+        except Exception as e:
+            log.error(f"Error feeding pet: {str(e)}")
 
 
 def parse_schedule_line(line):
@@ -125,62 +137,89 @@ def apply_random_offset(time_str, range_minutes, all_times):
     return time_str
 
 
-def load_and_schedule_feedings():
-    """Load feeding times and schedule them with randomization for non-fixed times."""
+def generate_todays_schedule():
+    """Read feeding_schedules.txt, roll fresh randomization for non-fixed
+    times, and save the result as today's schedule. Does NOT touch the job
+    registry — call resync_today() after."""
     # Default randomization range: ±30 minutes
     range_minutes = 30
 
-    schedule.clear()  # Clear existing schedules
+    with STATE_LOCK:
+        if not os.path.isfile('feeding_schedules.txt'):
+            open('feeding_schedules.txt', 'w').close()
+            log.info("feeding_schedules.txt not found. An empty file has been created.")
+            save_todays_schedule([])
+            return []
 
-    if not os.path.isfile('feeding_schedules.txt'):
-        open('feeding_schedules.txt', 'w').close()
-        log.info("feeding_schedules.txt not found. An empty file has been created.")
-        return []
+        todays_schedule = []
+        scheduled_times = []  # Track times to avoid conflicts
 
-    todays_schedule = []
-    scheduled_times = []  # Track times to avoid conflicts
+        with open('feeding_schedules.txt', 'r') as file:
+            lines = file.readlines()
 
-    with open('feeding_schedules.txt', 'r') as file:
-        lines = file.readlines()
+        if len(lines) == 0:
+            log.warning("feeding_schedules.txt is empty. Starting with an empty schedule.")
+            save_todays_schedule([])
+            return []
 
-    if len(lines) == 0:
-        log.warning("feeding_schedules.txt is empty. Starting with an empty schedule.")
-        return []
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
 
-    for line in lines:
-        line = line.strip()
-        if not line:
-            continue
+            time_str, portion, is_fixed = parse_schedule_line(line)
 
-        time_str, portion, is_fixed = parse_schedule_line(line)
+            # Apply randomization if not fixed
+            if not is_fixed:
+                actual_time = apply_random_offset(time_str, range_minutes, scheduled_times)
+                log.info(f"Randomized: {time_str} → {actual_time} ({portion} portion)")
+            else:
+                actual_time = time_str
+                log.info(f"Fixed time: {actual_time} ({portion} portion)")
 
-        # Apply randomization if not fixed
-        if not is_fixed:
-            actual_time = apply_random_offset(time_str, range_minutes, scheduled_times)
-            log.info(f"Randomized: {time_str} → {actual_time} ({portion} portion)")
-        else:
-            actual_time = time_str
-            log.info(f"Fixed time: {actual_time} ({portion} portion)")
+            # Track this time for conflict avoidance
+            scheduled_times.append(datetime.strptime(actual_time, "%H:%M"))
 
-        # Track this time for conflict avoidance
-        scheduled_times.append(datetime.strptime(actual_time, "%H:%M"))
+            # Store for scheduling and web UI display
+            todays_schedule.append({
+                'base_time': time_str,
+                'actual_time': actual_time,
+                'portion': portion,
+                'is_fixed': is_fixed,
+                'randomized': actual_time != time_str
+            })
 
-        # Schedule the feeding
-        schedule.every().day.at(actual_time).do(lambda p=portion: feed_pet(portion=p))
+        save_todays_schedule(todays_schedule)
+        return todays_schedule
 
-        # Store for today's schedule display
-        todays_schedule.append({
-            'base_time': time_str,
-            'actual_time': actual_time,
-            'portion': portion,
-            'is_fixed': is_fixed,
-            'randomized': actual_time != time_str
-        })
 
-    # Save today's schedule for web UI
-    save_todays_schedule(todays_schedule)
+def resync_today():
+    """Rebuild the job registry from todays_schedule.json.
 
-    return todays_schedule
+    Call after any mutation of today's schedule. run_pending() first: a job
+    coming due in the sub-second window before clear() would otherwise be
+    silently lost — the library zeroes seconds, so re-registering a time
+    that just passed lands tomorrow. Same property is what makes this safe:
+    already-fired feedings re-register for tomorrow, never again today.
+    """
+    with STATE_LOCK:
+        schedule.run_pending()
+        schedule.clear()
+        for entry in load_todays_schedule() or []:
+            schedule.every().day.at(entry['actual_time']).do(feed_pet, portion=entry['portion'])
+
+
+def ensure_today():
+    """Startup/day-change entry: reuse today's already-rolled times if the
+    file is current — re-randomizing on every restart could re-fire an
+    already-dispensed feeding later the same day — else generate fresh.
+    Either way, sync the job registry."""
+    with STATE_LOCK:
+        todays = load_todays_schedule()
+        if todays is None:
+            todays = generate_todays_schedule()
+        resync_today()
+        return todays
 
 
 def save_todays_schedule(schedule_data):

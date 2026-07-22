@@ -3,10 +3,15 @@
 Run: python3 -m unittest
 """
 
+import os
+import tempfile
 import unittest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from unittest.mock import patch
 
+import schedule
+
+import feeder_core
 import feeding_stats
 from feeder_core import parse_schedule_line, apply_random_offset
 
@@ -188,6 +193,78 @@ class TestTotals(unittest.TestCase):
         self.assertEqual(rate['weekly_cups'], 3.5)
         self.assertIsNone(feeding_stats.calculate_consumption_rate(
             feeding_stats.parse_weekly_stats(lines=["\n"])))
+
+
+class TestResync(unittest.TestCase):
+    """Job-registry sync against todays_schedule.json (runs in a temp cwd)."""
+
+    def setUp(self):
+        self._olddir = os.getcwd()
+        self._tmp = tempfile.TemporaryDirectory()
+        os.chdir(self._tmp.name)
+        schedule.clear()
+
+    def tearDown(self):
+        schedule.clear()
+        os.chdir(self._olddir)
+        self._tmp.cleanup()
+
+    @staticmethod
+    def _entry(actual_time, portion='small'):
+        return {'base_time': actual_time, 'actual_time': actual_time,
+                'portion': portion, 'is_fixed': True, 'randomized': False}
+
+    def test_passed_time_registers_for_tomorrow(self):
+        # 00:00 has always passed by the time this runs → next_run is
+        # tomorrow, so resyncing after a feeding fired never re-fires it.
+        feeder_core.save_todays_schedule([self._entry('00:00')])
+        feeder_core.resync_today()
+        self.assertEqual(len(schedule.jobs), 1)
+        self.assertEqual(schedule.jobs[0].next_run.date(), date.today() + timedelta(days=1))
+
+    def test_resync_fires_due_job_before_clearing(self):
+        # A job that came due just before a mutation must fire, not vanish.
+        fired = []
+        job = schedule.every().day.at("00:00").do(lambda: fired.append(1))
+        job.next_run = datetime.now() - timedelta(seconds=1)
+        feeder_core.resync_today()
+        self.assertEqual(fired, [1])
+
+    def test_resync_replaces_registry_from_file(self):
+        schedule.every().day.at("00:00").do(lambda: None)  # stale job
+        feeder_core.save_todays_schedule([self._entry('00:00'), self._entry('00:01', 'large')])
+        feeder_core.resync_today()
+        self.assertEqual(len(schedule.jobs), 2)
+
+    def test_resync_with_no_file_leaves_registry_empty(self):
+        schedule.every().day.at("00:00").do(lambda: None)
+        feeder_core.resync_today()
+        self.assertEqual(schedule.jobs, [])
+
+    def test_ensure_today_preserves_current_schedule(self):
+        # Restart fix: today's already-rolled times must NOT be re-randomized.
+        entries = [self._entry('00:00', 'medium')]
+        feeder_core.save_todays_schedule(entries)
+        self.assertEqual(feeder_core.ensure_today(), entries)
+        self.assertEqual(len(schedule.jobs), 1)
+
+    def test_ensure_today_regenerates_stale_file(self):
+        with open('feeding_schedules.txt', 'w') as f:
+            f.write("08:00,medium,fixed\n")
+        stale = {'date': (date.today() - timedelta(days=1)).isoformat(),
+                 'schedule': [self._entry('09:30')]}
+        import json
+        with open(feeder_core.TODAYS_SCHEDULE_FILE, 'w') as f:
+            json.dump(stale, f)
+        result = feeder_core.ensure_today()
+        self.assertEqual(len(result), 1)
+        self.assertEqual((result[0]['actual_time'], result[0]['portion']), ('08:00', 'medium'))
+        self.assertEqual(len(schedule.jobs), 1)
+
+    def test_generate_with_empty_schedules_saves_empty_today(self):
+        open('feeding_schedules.txt', 'w').close()
+        self.assertEqual(feeder_core.generate_todays_schedule(), [])
+        self.assertEqual(feeder_core.load_todays_schedule(), [])
 
 
 if __name__ == '__main__':
