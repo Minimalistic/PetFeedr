@@ -9,7 +9,7 @@ from servo_controller import PORTION_SIZES, DEFAULT_PORTION
 from DRV8825 import SIMULATION_MODE
 import hopper
 
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.2.0"
 
 # Configurable port - default 5000, override with PETFEEDR_PORT env var
 WEB_PORT = int(os.environ.get('PETFEEDR_PORT', 5000))
