@@ -211,6 +211,29 @@ class TestFailureHandling(unittest.TestCase):
             os.environ.pop('PUSHOVER_USER', None)
             self.assertFalse(notify.send("test"))  # no exception, no network
 
+    def test_sim_mode_suppresses_even_with_creds(self):
+        # A dev box with real Pushover creds in the shell env must never
+        # page a phone from a simulation run.
+        import notify
+        with patch.dict(os.environ, {'PUSHOVER_TOKEN': 'x', 'PUSHOVER_USER': 'y'}), \
+             patch('notify.SIMULATION_MODE', True), \
+             patch('notify.urllib.request.urlopen') as mock_open:
+            os.environ.pop('PETFEEDR_NOTIFY_IN_SIM', None)
+            self.assertFalse(notify.send("test"))
+            mock_open.assert_not_called()
+
+    def test_sim_override_allows_send(self):
+        import notify
+        from unittest.mock import MagicMock
+        resp = MagicMock()
+        resp.__enter__.return_value.status = 200
+        with patch.dict(os.environ, {'PUSHOVER_TOKEN': 'x', 'PUSHOVER_USER': 'y',
+                                     'PETFEEDR_NOTIFY_IN_SIM': 'true'}), \
+             patch('notify.SIMULATION_MODE', True), \
+             patch('notify.urllib.request.urlopen', return_value=resp) as mock_open:
+            self.assertTrue(notify.send("test"))
+            mock_open.assert_called_once()
+
     def test_feed_pet_failure_returns_false_and_notifies(self):
         with patch('feeder_core.trigger_servo', side_effect=RuntimeError("jam")), \
              patch('feeder_core.notify.send') as mock_send:
