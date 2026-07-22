@@ -29,56 +29,6 @@ logging.getLogger('').addHandler(console_handler)
 TODAYS_SCHEDULE_FILE = 'todays_schedule.json'
 
 
-def get_hopper_ascii(level):
-    if level == 100:
-        return """
-            _____________
-            |◍◍◍◍◍◍◍◍◍◍◍|
-            |◍◍◍◍◍◍◍◍◍◍◍|
-            |◍◍◍◍◍◍◍◍◍◍◍|
-            |\◍◍◍◍◍◍◍◍◍/|
-            | \◍◍◍◍◍◍◍/ |
-            |  \◍◍◍◍◍/  |
-            |   \◍◍◍/   |
-            |    \◍/    |
-            |   [ @ ]   |
-            |    | |    |
-            ||___| |___||
-            |\         /|
-            | \       / |
-            |  \     /  |
-            |   \   /   |
-            |    \ /    |
-            |    | |    |
-            |____| |____| 
-            \___________/  
-        """
-    elif level == 75:
-        return """
-            _____________
-            |           |
-            |           |
-            |◍ ◍ ◍ ◍ ◍ ◍|
-            |\◍◍◍◍◍◍◍◍◍/|
-            | \◍◍◍◍◍◍◍/ |
-            |  \◍◍◍◍◍/  |
-            |   \◍◍◍/   |
-            |    \◍/    |
-            |   [ @ ]   |
-            |    | |    |
-            ||___| |___||
-            |\         /|
-            | \       / |
-            |  \     /  |
-            |   \   /   |
-            |    \ /    |
-            |    | |    |
-            |____| |____| 
-            \___________/  
-        """
-    return ""
-
-
 def feed_pet(portion=DEFAULT_PORTION):
     """Feed the pet with the specified portion size."""
     try:
