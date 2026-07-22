@@ -76,55 +76,58 @@ class TestApplyRandomOffset(unittest.TestCase):
             self.assertEqual(apply_random_offset("08:00", 30, existing), "08:00")
 
 
-# Real log line shapes observed in production and dev
-PLAIN_MANUAL = "2026-04-15 07:15:07 - Manual feeding triggered (small portion)"
-PLAIN_SCHEDULED = "2026-04-15 07:15:07 - Feeding at 07:15 AM (small portion)"
-INFO_COMPLETED = "2026-05-10 04:00:00,391 - INFO - Feeding completed in 0.31s (small portion)"
-INFO_MANUAL = "2026-07-11 21:32:23,525 - INFO - Manual feeding triggered (small portion)"
+# Real log line shapes: every historical format plus the current schema
+NEW_MANUAL = "2026-07-22 14:00:00,430 - INFO - Feeding completed in 0.31s (small portion, manual)"
+NEW_SCHEDULED = "2026-07-22 06:00:00,101 - INFO - Feeding completed in 0.62s (medium portion, scheduled)"
+LEGACY_COMPLETED = "2026-05-10 04:00:00,391 - INFO - Feeding completed in 0.31s (small portion)"
 SIM_COMPLETED = "2026-03-22 00:21:34,508 - INFO - [SIM] ✅ Feeding completed in 0.92s (medium portion)"
+SIM_NEW = "2026-07-22 15:09:01,195 - INFO - [SIM] ✅ Feeding completed in 0.94s (medium portion, manual)"
+PLAIN_COMPLETED = "2026-04-15 07:15:07 - Feeding completed in 0.31s (small portion)"
+FAILED = "2026-07-22 08:00:01,001 - ERROR - Feeding failed (large portion, scheduled): jam"
+LEGACY_MANUAL_TRIGGERED = "2026-07-11 21:32:23,525 - INFO - Manual feeding triggered (small portion)"
+LEGACY_FEEDING_AT = "2026-04-15 07:15:07 - Feeding at 07:15 AM (small portion)"
 WERKZEUG = '2026-04-29 12:34:44,239 - INFO - 192.168.1.10 - - [29/Apr/2026 12:34:44] "GET /sw.js HTTP/1.1" 200 -'
 
 
 class TestLogPatterns(unittest.TestCase):
-    """Pin current regex behavior, including known gaps fixed in a later commit."""
+    def test_completed_matrix(self):
+        cases = [
+            (NEW_MANUAL, ("2026-07-22", "14:00:00", "small", "manual")),
+            (NEW_SCHEDULED, ("2026-07-22", "06:00:00", "medium", "scheduled")),
+            (LEGACY_COMPLETED, ("2026-05-10", "04:00:00", "small", None)),
+            (SIM_COMPLETED, ("2026-03-22", "00:21:34", "medium", None)),
+            (SIM_NEW, ("2026-07-22", "15:09:01", "medium", "manual")),
+            (PLAIN_COMPLETED, ("2026-04-15", "07:15:07", "small", None)),
+        ]
+        for line, expected in cases:
+            m = feeding_stats.COMPLETED_RE.match(line)
+            self.assertIsNotNone(m, line)
+            self.assertEqual((m['date'], m['time'], m['portion'], m['source']), expected, line)
 
-    def test_plain_manual_matches(self):
-        m = feeding_stats.MANUAL_PAT.match(PLAIN_MANUAL)
-        self.assertEqual(m.groups(), ("2026-04-15", "07:15:07", "small"))
+    def test_failed_line_matches_failed_only(self):
+        m = feeding_stats.FAILED_RE.match(FAILED)
+        self.assertEqual((m['portion'], m['source']), ("large", "scheduled"))
+        self.assertIsNone(feeding_stats.COMPLETED_RE.match(FAILED))
 
-    def test_plain_scheduled_matches(self):
-        m = feeding_stats.SCHED_PAT.match(PLAIN_SCHEDULED)
-        self.assertEqual(m.groups(), ("2026-04-15", "07:15:07", "small"))
-
-    def test_info_completed_matches(self):
-        m = feeding_stats.COMPLETED_PAT.match(INFO_COMPLETED)
-        self.assertEqual(m.groups(), ("2026-05-10", "04:00:00", "small"))
-
-    def test_info_manual_not_matched_yet(self):
-        # Known bug pinned: live-Pi manual lines carry ",ms - INFO -" and are missed.
-        self.assertIsNone(feeding_stats.MANUAL_PAT.match(INFO_MANUAL))
-
-    def test_sim_completed_not_matched_yet(self):
-        # Known gap pinned: "[SIM] ✅ " prefix defeats the completed pattern.
-        self.assertIsNone(feeding_stats.COMPLETED_PAT.match(SIM_COMPLETED))
-
-    def test_werkzeug_noise_never_matches(self):
-        for pat in (feeding_stats.MANUAL_PAT, feeding_stats.SCHED_PAT, feeding_stats.COMPLETED_PAT):
-            self.assertIsNone(pat.match(WERKZEUG))
+    def test_non_dispense_lines_never_match(self):
+        # Legacy trigger/announce lines had companion completed lines —
+        # counting them would double-count. Werkzeug noise must never match.
+        for line in (LEGACY_MANUAL_TRIGGERED, LEGACY_FEEDING_AT, WERKZEUG):
+            self.assertIsNone(feeding_stats.COMPLETED_RE.match(line), line)
 
 
 def _line(days_ago, time_str, kind, portion):
     d = (datetime.now() - timedelta(days=days_ago)).strftime("%Y-%m-%d")
-    if kind == 'manual':
-        return f"{d} {time_str} - Manual feeding triggered ({portion} portion)\n"
-    return f"{d} {time_str},391 - INFO - Feeding completed in 0.31s ({portion} portion)\n"
+    if kind == 'legacy':
+        return f"{d} {time_str},391 - INFO - Feeding completed in 0.31s ({portion} portion)\n"
+    return f"{d} {time_str},391 - INFO - Feeding completed in 0.31s ({portion} portion, {kind})\n"
 
 
 class TestWeeklyStats(unittest.TestCase):
     def test_aggregates_by_day_and_portion(self):
         lines = [
-            _line(0, "06:00:00", 'completed', 'small'),
-            _line(0, "18:00:00", 'completed', 'medium'),
+            _line(0, "06:00:00", 'scheduled', 'small'),
+            _line(0, "18:00:00", 'scheduled', 'medium'),
             _line(1, "07:00:00", 'manual', 'large'),
         ]
         stats = feeding_stats.parse_weekly_stats(lines=lines)
@@ -136,8 +139,13 @@ class TestWeeklyStats(unittest.TestCase):
         yesterday = stats[-2]
         self.assertEqual((yesterday['large'], yesterday['manual_count']), (1, 1))
 
+    def test_legacy_lines_count_as_scheduled(self):
+        stats = feeding_stats.parse_weekly_stats(lines=[_line(0, "06:00:00", 'legacy', 'small')])
+        today = stats[-1]
+        self.assertEqual((today['total_feedings'], today['manual_count']), (1, 0))
+
     def test_old_lines_ignored(self):
-        stats = feeding_stats.parse_weekly_stats(lines=[_line(10, "06:00:00", 'completed', 'small')])
+        stats = feeding_stats.parse_weekly_stats(lines=[_line(10, "06:00:00", 'scheduled', 'small')])
         self.assertEqual(sum(d['total_feedings'] for d in stats), 0)
 
 
@@ -145,7 +153,7 @@ class TestRecentActivity(unittest.TestCase):
     def test_newest_first_with_types(self):
         lines = [
             _line(1, "07:00:00", 'manual', 'large'),
-            _line(0, "06:00:00", 'completed', 'small'),
+            _line(0, "06:00:00", 'scheduled', 'small'),
         ]
         activity = feeding_stats.parse_recent_activity(days=14, limit=50, lines=lines)
         self.assertEqual(len(activity), 2)
@@ -153,7 +161,7 @@ class TestRecentActivity(unittest.TestCase):
         self.assertEqual((activity[1]['date'], activity[1]['type']), ("Yesterday", 'manual'))
 
     def test_limit_respected(self):
-        lines = [_line(0, f"0{h}:00:00", 'completed', 'small') for h in range(1, 6)]
+        lines = [_line(0, f"0{h}:00:00", 'scheduled', 'small') for h in range(1, 6)]
         self.assertEqual(len(feeding_stats.parse_recent_activity(limit=2, lines=lines)), 2)
 
 
@@ -162,7 +170,7 @@ class TestDayFeedings(unittest.TestCase):
         target = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
         lines = [
             _line(1, "07:00:00", 'manual', 'large'),
-            _line(0, "06:00:00", 'completed', 'small'),
+            _line(0, "06:00:00", 'scheduled', 'small'),
         ]
         feedings, total = feeding_stats.day_feedings(target, lines=lines)
         self.assertEqual(len(feedings), 1)
@@ -178,15 +186,15 @@ class TestTotals(unittest.TestCase):
     def test_week_summary_variants(self):
         empty = feeding_stats.parse_weekly_stats(lines=["\n"])
         self.assertIsNone(feeding_stats.build_week_summary(empty))
-        stats = feeding_stats.parse_weekly_stats(lines=[_line(0, "06:00:00", 'completed', 'small')])
+        stats = feeding_stats.parse_weekly_stats(lines=[_line(0, "06:00:00", 'scheduled', 'small')])
         self.assertEqual(feeding_stats.build_week_summary(stats), "All feedings on schedule")
         stats = feeding_stats.parse_weekly_stats(lines=[_line(0, "06:00:00", 'manual', 'small')])
         self.assertEqual(feeding_stats.build_week_summary(stats), "1 manual feed this week")
 
     def test_consumption_rate(self):
         stats = feeding_stats.parse_weekly_stats(lines=[
-            _line(0, "06:00:00", 'completed', 'medium'),
-            _line(1, "06:00:00", 'completed', 'medium'),
+            _line(0, "06:00:00", 'scheduled', 'medium'),
+            _line(1, "06:00:00", 'scheduled', 'medium'),
         ])
         rate = feeding_stats.calculate_consumption_rate(stats)
         self.assertEqual(rate['daily_cups'], 0.5)

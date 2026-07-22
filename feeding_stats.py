@@ -12,15 +12,21 @@ from datetime import datetime, timedelta
 # Cups per portion size — single source of truth (was duplicated 3x)
 PORTION_CUPS = {'small': 0.25, 'medium': 0.50, 'large': 0.75}
 
-# Log line patterns, module-level so tests can exercise them directly.
-# Manual feeding:    "2026-04-15 07:15:07 - Manual feeding triggered (small portion)"
-# Scheduled feeding: "2026-04-15 07:15:07 - Feeding at 07:15 AM (small portion)"
-# Completed (Python logging format):
-#   "2026-04-29 06:00:00,908 - INFO - Feeding completed in 0.31s (small portion)"
-# Groups: (date, time, portion)
-MANUAL_PAT = re.compile(r'^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}) - Manual feeding triggered \((\w+) portion\)')
-SCHED_PAT = re.compile(r'^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}) - Feeding at .* \((\w+) portion\)')
-COMPLETED_PAT = re.compile(r'^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}),\d+ - INFO - Feeding completed in [\d.]+s \((\w+) portion\)')
+# The "Feeding completed" line is the single record of a dispense — written
+# by trigger_servo on success, tagged with its source since the schema change:
+#   "2026-07-22 14:00:00,430 - INFO - Feeding completed in 0.31s (small portion, manual)"
+# One tolerant pattern family covers every historical shape: optional ,ms,
+# optional "LEVEL - ", optional "[SIM] ✅ " prefix, optional ", source"
+# suffix (absent → scheduled, matching pre-schema behavior). Legacy
+# "Manual feeding triggered" lines are deliberately not counted — each had a
+# companion completed line, so matching both would double-count.
+LOG_PREFIX = r'^(?P<date>\d{4}-\d{2}-\d{2}) (?P<time>\d{2}:\d{2}:\d{2})(?:,\d+)? - (?:\w+ - )?'
+COMPLETED_RE = re.compile(LOG_PREFIX +
+                          r'(?:\[SIM\] )?(?:✅ )?Feeding completed in [\d.]+s '
+                          r'\((?P<portion>\w+) portion(?:, (?P<source>\w+))?\)')
+# Failures are logged by feed_pet; parsed separately so they never count as food dispensed
+FAILED_RE = re.compile(LOG_PREFIX +
+                       r'Feeding failed \((?P<portion>\w+) portion, (?P<source>\w+)\)')
 
 
 def read_all_log_lines():
@@ -54,21 +60,13 @@ def parse_recent_activity(days=14, limit=50, lines=None):
     cutoff_date = datetime.now() - timedelta(days=days)
 
     for line in reversed(lines):
-        line = line.strip()
-        if not line:
-            continue
-
-        match = MANUAL_PAT.match(line)
-        feed_type = 'manual'
-        if not match:
-            match = SCHED_PAT.match(line) or COMPLETED_PAT.match(line)
-            feed_type = 'scheduled'
+        match = COMPLETED_RE.match(line.strip())
         if not match:
             continue
 
-        date_str, time_str, portion = match.groups()
         try:
-            timestamp = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M:%S")
+            timestamp = datetime.strptime(
+                f"{match['date']} {match['time']}", "%Y-%m-%d %H:%M:%S")
         except ValueError:
             continue
         if timestamp < cutoff_date:
@@ -77,8 +75,8 @@ def parse_recent_activity(days=14, limit=50, lines=None):
         activity.append({
             'date': format_activity_date(timestamp),
             'time': timestamp.strftime("%I:%M %p"),
-            'portion': portion,
-            'type': feed_type
+            'portion': match['portion'],
+            'type': match['source'] or 'scheduled'
         })
         if len(activity) >= limit:
             break
@@ -123,17 +121,14 @@ def parse_weekly_stats(lines=None):
         }
 
     for line in lines:
-        stripped = line.strip()
-        manual_match = MANUAL_PAT.match(stripped)
-        sched_match = SCHED_PAT.match(stripped) or COMPLETED_PAT.match(stripped)
-        match = manual_match or sched_match
+        match = COMPLETED_RE.match(line.strip())
         if match:
-            date_str, _, portion = match.groups()
+            date_str, portion = match['date'], match['portion']
             if date_str in stats and portion in PORTION_CUPS:
                 stats[date_str][portion] += 1
                 stats[date_str]['total_cups'] += PORTION_CUPS[portion]
                 stats[date_str]['total_feedings'] += 1
-                if manual_match:
+                if match['source'] == 'manual':
                     stats[date_str]['manual_count'] += 1
 
     return list(stats.values())
@@ -187,21 +182,18 @@ def day_feedings(date_str, lines=None):
 
     feedings = []
     for line in lines:
-        stripped = line.strip()
-        manual_match = MANUAL_PAT.match(stripped)
-        completed_match = COMPLETED_PAT.match(stripped)
-        match = manual_match or completed_match
+        match = COMPLETED_RE.match(line.strip())
         if match:
-            d, t, portion = match.groups()
-            if d == date_str and portion in PORTION_CUPS:
-                h, m, s = t.split(':')
+            portion = match['portion']
+            if match['date'] == date_str and portion in PORTION_CUPS:
+                h, m, _ = match['time'].split(':')
                 hour = int(h)
                 time_12h = f"{hour % 12 or 12}:{m} {'AM' if hour < 12 else 'PM'}"
                 feedings.append({
                     'time': time_12h,
                     'portion': portion,
                     'cups': PORTION_CUPS[portion],
-                    'type': 'manual' if manual_match else 'scheduled'
+                    'type': match['source'] or 'scheduled'
                 })
 
     total_cups = sum(f['cups'] for f in feedings)

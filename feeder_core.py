@@ -60,19 +60,16 @@ def setup_logging(console_only=False):
 TODAYS_SCHEDULE_FILE = 'todays_schedule.json'
 
 
-def feed_pet(portion=DEFAULT_PORTION):
+def feed_pet(portion=DEFAULT_PORTION, source='scheduled'):
     """Feed the pet with the specified portion size.
 
     Locked so a manual feed (Flask thread) can never drive the motor
-    concurrently with a scheduled feed (main thread).
+    concurrently with a scheduled feed (main thread). The servo's
+    "Feeding completed" line is the log record the stats parse.
     """
     with STATE_LOCK:
         try:
-            trigger_servo(portion=portion)
-            log.info("Triggering Servo to feed the pet")
-            log.info(" > ^ <")
-            log.info("( o.o ) Food dispensed successfully!")
-            log.info(" /\\_/\\💕")
+            trigger_servo(portion=portion, source=source)
         except Exception as e:
             log.error(f"Error feeding pet: {str(e)}")
 

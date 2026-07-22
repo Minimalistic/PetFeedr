@@ -36,12 +36,14 @@ def get_portion_description(portion_name):
     return PORTION_SIZES[DEFAULT_PORTION][1]
 
 
-def trigger_servo(portion='small'):
+def trigger_servo(portion='small', source='scheduled'):
     """Trigger the motor to dispense food.
-    
+
     Args:
         portion: Size of portion to dispense ('small', 'medium', 'large')
-    
+        source: 'scheduled' or 'manual' — recorded in the completed log
+            line, which is the single source of truth for feeding stats
+
     Larger portions are dispensed as multiple cycles of the base unit
     for more consistent results.
     """
@@ -78,9 +80,9 @@ def trigger_servo(portion='small'):
 
         elapsed = time.time() - start_time
         if SIMULATION_MODE:
-            log.info(f"[SIM] ✅ Feeding completed in {elapsed:.2f}s ({portion} portion)")
+            log.info(f"[SIM] ✅ Feeding completed in {elapsed:.2f}s ({portion} portion, {source})")
         else:
-            log.info(f"Feeding completed in {elapsed:.2f}s ({portion} portion)")
+            log.info(f"Feeding completed in {elapsed:.2f}s ({portion} portion, {source})")
 
     except Exception as e:
         log.exception("An error occurred while triggering the servo:")

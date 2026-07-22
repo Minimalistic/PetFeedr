@@ -437,8 +437,9 @@ def trigger_feeding():
     if portion not in PORTION_SIZES:
         portion = DEFAULT_PORTION
     
-    feed_pet(portion=portion)
-    log.info(f"Manual feeding triggered ({portion} portion)")
+    # No separate "Manual feeding triggered" line — the servo's completed
+    # line carries the source, and a second line would double-count in stats
+    feed_pet(portion=portion, source='manual')
     if wants_json():
         return jsonify({'success': True, 'message': f'Dispensed {portion} portion'})
     return redirect('/')
