@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 
+import os
+import signal
+import sys
 import schedule
-import subprocess
 import time
 from datetime import date
+from threading import Thread
 
 from feeder_core import load_and_schedule_feedings, log, setup_logging
 from DRV8825 import SIMULATION_MODE
+import web_interface
 
 
 def run():
@@ -36,20 +40,34 @@ def run():
         time.sleep(1)
 
 
-def run_web_interface():
-    """Start the web interface using subprocess."""
-    subprocess.Popen(["python3", "web_interface.py"])
+def run_web():
+    """Web UI in a daemon thread of this process.
+
+    If Flask dies (port in use, bad config), exit the whole process so
+    systemd restarts it — otherwise the scheduler would keep running
+    behind a silently dead UI.
+    """
+    try:
+        web_interface.app.run(host='0.0.0.0', port=web_interface.WEB_PORT,
+                              debug=False, use_reloader=False)
+    except Exception:
+        log.exception("Web interface crashed")
+        os._exit(1)
 
 
 def main():
     setup_logging()
+    # SystemExit unwinds the main thread, so a SIGTERM mid-dispense (deploy,
+    # service restart) still runs trigger_servo's finally: Motor.Stop()
+    signal.signal(signal.SIGTERM, lambda *args: sys.exit(0))
+
     if SIMULATION_MODE:
         log.info("=" * 50)
         log.info("🔧 PETFEEDR RUNNING IN SIMULATION MODE")
         log.info("   No hardware will be touched!")
         log.info("=" * 50)
 
-    run_web_interface()
+    Thread(target=run_web, daemon=True).start()
     log.info("PetFeedr started successfully!")
     run()
 

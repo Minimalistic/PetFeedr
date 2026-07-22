@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 
 import os
-import time
-from threading import Thread
 from feeder_core import (feed_pet, load_todays_schedule, save_todays_schedule,
                          apply_random_offset, TODAYS_SCHEDULE_FILE, log, setup_logging)
 from feeding_stats import (parse_recent_activity, parse_weekly_stats, build_week_summary,
@@ -14,9 +12,8 @@ APP_VERSION = "1.1.0"
 
 # Configurable port - default 5000, override with PETFEEDR_PORT env var
 WEB_PORT = int(os.environ.get('PETFEEDR_PORT', 5000))
-from datetime import datetime, timedelta
+from datetime import datetime
 from flask import Flask, redirect, url_for, request, render_template, jsonify
-import schedule
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', os.urandom(24).hex())
@@ -130,12 +127,6 @@ def mark_past_feedings(schedules):
             sched['is_next'] = False
     
     return schedules
-
-
-def run_schedule():
-    while True:
-        schedule.run_pending()
-        time.sleep(1)
 
 
 @app.route('/')
@@ -447,10 +438,10 @@ def service_worker():
 
 
 def main():
-    setup_logging()
-    schedule_thread = Thread(target=run_schedule)
-    schedule_thread.start()
-    log.info(f"Starting web interface on port {WEB_PORT}")
+    """Standalone dev entry — UI only, no scheduler. Console-only logging so
+    a dev instance can never race the service's log rotation."""
+    setup_logging(console_only=True)
+    log.info(f"Starting web interface (standalone dev) on port {WEB_PORT}")
     app.run(host='0.0.0.0', port=WEB_PORT, debug=os.environ.get('FLASK_DEBUG', 'false').lower() == 'true')
 
 
