@@ -203,6 +203,27 @@ class TestTotals(unittest.TestCase):
             feeding_stats.parse_weekly_stats(lines=["\n"])))
 
 
+class TestFailureHandling(unittest.TestCase):
+    def test_notify_unconfigured_is_noop(self):
+        import notify
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop('PUSHOVER_TOKEN', None)
+            os.environ.pop('PUSHOVER_USER', None)
+            self.assertFalse(notify.send("test"))  # no exception, no network
+
+    def test_feed_pet_failure_returns_false_and_notifies(self):
+        with patch('feeder_core.trigger_servo', side_effect=RuntimeError("jam")), \
+             patch('feeder_core.notify.send') as mock_send:
+            self.assertFalse(feeder_core.feed_pet(portion='large', source='manual'))
+            self.assertIn("large portion, manual", mock_send.call_args[0][0])
+
+    def test_feed_pet_success_returns_true_without_notifying(self):
+        with patch('feeder_core.trigger_servo'), \
+             patch('feeder_core.notify.send') as mock_send:
+            self.assertTrue(feeder_core.feed_pet())
+            mock_send.assert_not_called()
+
+
 class TestResync(unittest.TestCase):
     """Job-registry sync against todays_schedule.json (runs in a temp cwd)."""
 

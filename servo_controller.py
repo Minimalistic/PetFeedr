@@ -84,13 +84,9 @@ def trigger_servo(portion='small', source='scheduled'):
         else:
             log.info(f"Feeding completed in {elapsed:.2f}s ({portion} portion, {source})")
 
-    except Exception as e:
-        log.exception("An error occurred while triggering the servo:")
-        if Motor1:
-            Motor1.Stop()
-            log.info("Motor stopped due to an exception")
-
     finally:
+        # Errors propagate to feed_pet (which logs and alerts) — but the
+        # motor is always de-energized, exception or not
         if Motor1:
             Motor1.Stop()
             log.debug("Motor stopped and cleaned up")

@@ -14,6 +14,7 @@ import threading
 from logging.handlers import TimedRotatingFileHandler
 from datetime import datetime, timedelta, date
 from servo_controller import trigger_servo, PORTION_SIZES, DEFAULT_PORTION
+import notify
 
 # One lock for everything that touches the schedule files, the job registry,
 # or the motor. The `schedule` library has no thread safety of its own, and
@@ -61,17 +62,24 @@ TODAYS_SCHEDULE_FILE = 'todays_schedule.json'
 
 
 def feed_pet(portion=DEFAULT_PORTION, source='scheduled'):
-    """Feed the pet with the specified portion size.
+    """Feed the pet with the specified portion size. Returns True on success.
 
     Locked so a manual feed (Flask thread) can never drive the motor
     concurrently with a scheduled feed (main thread). The servo's
     "Feeding completed" line is the log record the stats parse.
+
+    A dispense failure is the worst failure mode this device has — a
+    silently unfed pet — so it pushes a phone notification, not just a log.
     """
     with STATE_LOCK:
         try:
             trigger_servo(portion=portion, source=source)
+            return True
         except Exception as e:
-            log.error(f"Error feeding pet: {str(e)}")
+            log.exception(f"Feeding failed ({portion} portion, {source}): {e}")
+            notify.send(f"Feeding FAILED ({portion} portion, {source}): {e} — "
+                        "the motor may be jammed.", priority=1)
+            return False
 
 
 def parse_schedule_line(line):

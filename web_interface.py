@@ -439,9 +439,11 @@ def trigger_feeding():
     
     # No separate "Manual feeding triggered" line — the servo's completed
     # line carries the source, and a second line would double-count in stats
-    feed_pet(portion=portion, source='manual')
+    ok = feed_pet(portion=portion, source='manual')
     if wants_json():
-        return jsonify({'success': True, 'message': f'Dispensed {portion} portion'})
+        if ok:
+            return jsonify({'success': True, 'message': f'Dispensed {portion} portion'})
+        return jsonify({'success': False, 'message': 'Feeding failed — check the feeder'}), 500
     return redirect('/')
 
 
