@@ -59,8 +59,10 @@ rsync -avz --delete \
     --exclude 'feeding_log.txt' \
     --exclude 'feeding_log.txt.*' \
     --exclude 'feeding_schedules.txt' \
-    --exclude 'settings.json' \
     --exclude 'todays_schedule.json' \
+    --exclude 'hopper.json' \
+    --exclude '.env' \
+    --exclude '.env.*' \
     --exclude 'node_modules/' \
     --exclude '.astro/' \
     --exclude '.claude/' \

@@ -27,6 +27,8 @@ After=multi-user.target
 Type=simple
 User=$PI_USER
 WorkingDirectory=$PI_PATH
+# Optional secrets (Pushover creds) — '-' tolerates a missing file
+EnvironmentFile=-$PI_PATH/.env
 ExecStart=/bin/bash -c 'source $PI_PATH/venv/bin/activate && python $PI_PATH/PetFeedr.py'
 Restart=always
 
@@ -39,9 +41,10 @@ echo "🔄 Enabling service..."
 sudo systemctl daemon-reload
 sudo systemctl enable petfeedr.service
 
-# Start the service
+# Restart (not start) so re-running this script applies unit changes
+# to an already-running service
 echo "▶️  Starting service..."
-sudo systemctl start petfeedr.service
+sudo systemctl restart petfeedr.service
 
 # Check status
 echo ""

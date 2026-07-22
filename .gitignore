@@ -22,6 +22,7 @@ feeding_schedules.txt
 feeding_log.txt
 feeding_log.txt.*
 todays_schedule.json
+hopper.json
 *.log
 
 # Tooling debris
