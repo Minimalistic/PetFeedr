@@ -1410,3 +1410,71 @@ body {
     .show-on-lg { display: block; }
     .hide-on-lg { display: none !important; }
 }
+
+/* ===== Hopper Card ===== */
+.hopper-learning {
+    font-size: 0.95rem;
+    color: var(--color-text);
+    margin-bottom: 4px;
+}
+
+.hopper-amount {
+    font-family: var(--font-display);
+    font-weight: 600;
+    color: var(--color-primary);
+}
+
+.hopper-gauge {
+    height: 14px;
+    border-radius: var(--radius-sm);
+    background: var(--color-input-bg);
+    border: 1px solid var(--color-border-light);
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.hopper-fill {
+    height: 100%;
+    width: calc(var(--hopper-level) * 100%);
+    border-radius: inherit;
+    background: var(--color-success);
+    transition: width 0.4s ease;
+}
+
+.hopper-fill.hopper-low {
+    background: var(--color-warning);
+}
+
+.hopper-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    font-size: 0.85rem;
+    color: var(--color-text-muted);
+}
+
+.hopper-capacity {
+    margin-left: auto;
+}
+
+.hopper-refill {
+    margin-top: 12px;
+}
+
+.refill-form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 10px;
+    font-size: 0.9rem;
+    color: var(--color-text-muted);
+}
+
+.refill-form select {
+    padding: 8px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border);
+    background: var(--color-input-bg);
+    color: var(--color-text);
+    font-family: var(--font-body);
+}

@@ -296,5 +296,81 @@ class TestResync(unittest.TestCase):
         self.assertEqual(feeder_core.load_todays_schedule(), [])
 
 
+class TestHopper(unittest.TestCase):
+    """Hopper learning and low-warning logic (runs in a temp cwd)."""
+
+    def setUp(self):
+        self._olddir = os.getcwd()
+        self._tmp = tempfile.TemporaryDirectory()
+        os.chdir(self._tmp.name)
+
+    def tearDown(self):
+        os.chdir(self._olddir)
+        self._tmp.cleanup()
+
+    def test_fresh_state_is_learning(self):
+        import hopper
+        info = hopper.status()
+        self.assertTrue(info['learning'])
+        self.assertEqual(info['cups_since_refill'], 0.0)
+        self.assertIsNone(info['days_left'])
+
+    def test_refill_learns_capacity_and_resets_counter(self):
+        import hopper
+        for _ in range(4):
+            hopper.record_dispense(2.5)  # 10 cups total
+        state = hopper.record_refill(25)  # 25% left → consumed 75% → ~13.33 cups
+        self.assertAlmostEqual(hopper.capacity_cups(state), 13.33, places=2)
+        self.assertEqual(state['cups_since_refill'], 0.0)
+        info = hopper.status(daily_avg_cups=1.0)
+        self.assertFalse(info['learning'])
+        self.assertEqual(info['level'], 1.0)
+        self.assertEqual(info['days_left'], 13)
+
+    def test_refill_without_dispenses_learns_nothing(self):
+        import hopper
+        state = hopper.record_refill(50)
+        self.assertIsNone(hopper.capacity_cups(state))
+
+    def test_capacity_is_median_of_recent_estimates(self):
+        import hopper
+        for est_source in [(7.5, 25), (10.0, 0), (20.0, 0)]:  # → 10, 10, 20
+            cups, pct = est_source
+            hopper.record_dispense(cups)
+            hopper.record_refill(pct)
+        self.assertAlmostEqual(hopper.capacity_cups(hopper.load_state()), 10.0)
+
+    def test_low_warning_fires_once_per_cycle(self):
+        import hopper
+        hopper.record_dispense(9.0)
+        hopper.record_refill(10)  # capacity ~10 cups
+        hopper.record_dispense(9.0)  # 10% left → low
+        self.assertIsNotNone(hopper.check_low(daily_avg_cups=1.0))
+        self.assertIsNone(hopper.check_low(daily_avg_cups=1.0))  # already notified
+        hopper.record_refill(10)  # reset re-arms the warning
+        hopper.record_dispense(9.5)
+        self.assertIsNotNone(hopper.check_low(daily_avg_cups=1.0))
+
+    def test_corrupt_state_file_resets(self):
+        import hopper
+        with open(hopper.HOPPER_FILE, 'w') as f:
+            f.write("not json{")
+        info = hopper.status()
+        self.assertTrue(info['learning'])
+
+    def test_refill_route_validates_percentage(self):
+        import web_interface
+        client = web_interface.app.test_client()
+        for bad in ('abc', '', '120', '-5'):
+            r = client.post('/refill', data={'remaining_pct': bad},
+                            headers={'Accept': 'application/json'})
+            self.assertEqual(r.status_code, 400, bad)
+            self.assertFalse(r.get_json()['success'])
+        r = client.post('/refill', data={'remaining_pct': '25'},
+                        headers={'Accept': 'application/json'})
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(r.get_json()['success'])
+
+
 if __name__ == '__main__':
     unittest.main()

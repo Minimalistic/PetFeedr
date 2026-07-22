@@ -283,6 +283,45 @@
                         <p class="empty-state">No feeding data yet</p>
                     {% endif %}
                 </section>
+
+                <!-- Hopper -->
+                <section class="card hopper-card">
+                    <div class="card-label">Hopper</div>
+                    {% if hopper.learning %}
+                        <div class="hopper-learning">
+                            <span class="hopper-amount">
+                                {{ hopper.cups_since_refill }} cup{{ 's' if hopper.cups_since_refill != 1 }}
+                            </span>
+                            dispensed since refill on {{ hopper.last_refill_label }}
+                        </div>
+                        <p class="setting-description">Capacity is learned from refills — when you top it up, tap "I refilled it" and give a rough guess of what was left.</p>
+                    {% else %}
+                        <div class="hopper-gauge" role="img" aria-label="Hopper about {{ (hopper.level * 100) | round | int }} percent full">
+                            <div class="hopper-fill {% if hopper.level <= 0.15 %}hopper-low{% endif %}" style="--hopper-level: {{ hopper.level }};"></div>
+                        </div>
+                        <div class="hopper-meta">
+                            <span>~{{ (hopper.level * 100) | round | int }}% full</span>
+                            {% if hopper.days_left is not none %}
+                                <span class="hopper-days">~{{ hopper.days_left }} day{{ 's' if hopper.days_left != 1 }} of food left</span>
+                            {% endif %}
+                            <span class="hopper-capacity">holds ~{{ hopper.capacity }} cups</span>
+                        </div>
+                    {% endif %}
+                    <div class="hopper-refill">
+                        <button type="button" class="btn btn-secondary" id="refill-toggle">I refilled it</button>
+                        <form action="/refill" method="post" class="refill-form" hidden>
+                            <label for="remaining_pct">How full was it before you refilled?</label>
+                            <select id="remaining_pct" name="remaining_pct">
+                                <option value="0">Empty</option>
+                                <option value="10" selected>~10%</option>
+                                <option value="25">~25%</option>
+                                <option value="50">~50%</option>
+                                <option value="75">~75%</option>
+                            </select>
+                            <button type="submit" class="btn btn-primary">Save refill</button>
+                        </form>
+                    </div>
+                </section>
             </div>
 
             <footer class="status-footer">

@@ -14,6 +14,8 @@ import threading
 from logging.handlers import TimedRotatingFileHandler
 from datetime import datetime, timedelta, date
 from servo_controller import trigger_servo, PORTION_SIZES, DEFAULT_PORTION
+from feeding_stats import PORTION_CUPS, parse_weekly_stats, calculate_consumption_rate
+import hopper
 import notify
 
 # One lock for everything that touches the schedule files, the job registry,
@@ -74,12 +76,27 @@ def feed_pet(portion=DEFAULT_PORTION, source='scheduled'):
     with STATE_LOCK:
         try:
             trigger_servo(portion=portion, source=source)
-            return True
         except Exception as e:
             log.exception(f"Feeding failed ({portion} portion, {source}): {e}")
             notify.send(f"Feeding FAILED ({portion} portion, {source}): {e} — "
                         "the motor may be jammed.", priority=1)
             return False
+        _track_hopper(portion)
+        return True
+
+
+def _track_hopper(portion):
+    """Count the dispense toward hopper level; warn once when running low.
+    Tracking must never break a feeding that already succeeded."""
+    try:
+        hopper.record_dispense(PORTION_CUPS.get(portion, 0.25))
+        rate = calculate_consumption_rate(parse_weekly_stats())
+        message = hopper.check_low(rate['daily_cups'] if rate else None)
+        if message:
+            log.info(message)
+            notify.send(message)
+    except Exception as e:
+        log.warning(f"Hopper tracking failed: {e}")
 
 
 def parse_schedule_line(line):

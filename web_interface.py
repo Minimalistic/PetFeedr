@@ -7,6 +7,7 @@ from feeding_stats import (parse_recent_activity, parse_weekly_stats, build_week
                            calculate_consumption_rate, calculate_daily_total, day_feedings)
 from servo_controller import PORTION_SIZES, DEFAULT_PORTION
 from DRV8825 import SIMULATION_MODE
+import hopper
 
 APP_VERSION = "1.1.0"
 
@@ -170,6 +171,14 @@ def index():
 
     portion_info = {name: desc for name, (cycles, desc) in PORTION_SIZES.items()}
 
+    # Hopper status card
+    hopper_status = hopper.status(consumption['daily_cups'] if consumption else None)
+    try:
+        hopper_status['last_refill_label'] = datetime.strptime(
+            hopper_status['last_refill'], "%Y-%m-%d").strftime("%b %d")
+    except (ValueError, TypeError):
+        hopper_status['last_refill_label'] = hopper_status['last_refill']
+
     return render_template('index.html',
                            schedules=schedules,
                            next_feeding=next_feeding,
@@ -187,7 +196,8 @@ def index():
                            weekly_stats=weekly_stats,
                            max_daily_cups=max_daily_cups,
                            week_summary=week_summary,
-                           consumption=consumption)
+                           consumption=consumption,
+                           hopper=hopper_status)
 
 
 @app.route('/api/day-detail/<date_str>')
@@ -444,6 +454,34 @@ def trigger_feeding():
         if ok:
             return jsonify({'success': True, 'message': f'Dispensed {portion} portion'})
         return jsonify({'success': False, 'message': 'Feeding failed — check the feeder'}), 500
+    return redirect('/')
+
+
+@app.route('/refill', methods=['POST'])
+def refill():
+    """Record a hopper refill with a rough estimate of what was left."""
+    try:
+        remaining_pct = float(request.form.get('remaining_pct', ''))
+    except ValueError:
+        if wants_json():
+            return jsonify({'success': False, 'message': 'Invalid percentage'}), 400
+        return "Invalid percentage", 400
+    if not 0 <= remaining_pct <= 95:
+        if wants_json():
+            return jsonify({'success': False, 'message': 'Percentage must be between 0 and 95'}), 400
+        return "Percentage must be between 0 and 95", 400
+
+    with STATE_LOCK:
+        state = hopper.record_refill(remaining_pct)
+    capacity = hopper.capacity_cups(state)
+    log.info(f"Hopper refilled (was ~{remaining_pct:.0f}% full)")
+
+    if capacity:
+        message = f'Refill recorded — hopper holds ~{capacity} cups'
+    else:
+        message = 'Refill recorded'
+    if wants_json():
+        return jsonify({'success': True, 'message': message})
     return redirect('/')
 
 
