@@ -1,3 +1,9 @@
+/* The hidden attribute must always win — class display rules (.btn,
+   .refill-form, …) otherwise override the UA's [hidden] { display: none } */
+[hidden] {
+    display: none !important;
+}
+
 /* ===== CSS Variables ===== */
 :root {
     --color-bg: #f0f4f4;
