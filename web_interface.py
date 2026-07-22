@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 
 import os
-import re
 import time
-import json
-import glob
 import logging
 from threading import Thread
 from feeder_core import feed_pet, load_todays_schedule, save_todays_schedule, apply_random_offset, TODAYS_SCHEDULE_FILE
+from feeding_stats import (parse_recent_activity, parse_weekly_stats, build_week_summary,
+                           calculate_consumption_rate, calculate_daily_total, day_feedings)
 from servo_controller import PORTION_SIZES, DEFAULT_PORTION
 from DRV8825 import SIMULATION_MODE
 
@@ -96,22 +95,6 @@ def read_schedules_with_details():
     return schedules
 
 
-def calculate_daily_total(schedules):
-    """Calculate total cups per day from scheduled feedings."""
-    cups_per_portion = {
-        'small': 0.25,
-        'medium': 0.50,
-        'large': 0.75,
-    }
-    
-    total_cups = 0
-    for sched in schedules:
-        if isinstance(sched, dict):
-            total_cups += cups_per_portion.get(sched.get('portion', 'small'), 0.25)
-    
-    return total_cups
-
-
 def get_next_feeding(schedules):
     """Get the next upcoming feeding from the schedule."""
     if not schedules:
@@ -147,206 +130,6 @@ def mark_past_feedings(schedules):
             sched['is_next'] = False
     
     return schedules
-
-
-def read_all_log_lines():
-    """Read lines from feeding_log.txt and all rotated copies (feeding_log.txt.YYYY-MM-DD)."""
-    lines = []
-    # rotated files are older, sort them so oldest come first
-    rotated = sorted(glob.glob('feeding_log.txt.*'))
-    for path in rotated:
-        try:
-            with open(path, 'r') as f:
-                lines.extend(f.readlines())
-        except (FileNotFoundError, OSError):
-            continue
-    # current log file has the newest entries
-    try:
-        with open('feeding_log.txt', 'r') as f:
-            lines.extend(f.readlines())
-    except FileNotFoundError:
-        pass
-    return lines
-
-
-def parse_recent_activity(days=14, limit=50):
-    """Parse feeding log to extract recent activity in a user-friendly format."""
-    lines = read_all_log_lines()
-    if not lines:
-        return []
-    
-    activity = []
-    cutoff_date = datetime.now() - timedelta(days=days)
-    
-    # Patterns to match different log entries
-    # Manual feeding: "Manual feeding triggered (medium portion)"
-    # Scheduled feeding: "Feeding at 08:00 AM (small portion)"
-    # Completed feeding (Python logging format): "2026-04-29 06:00:00,908 - INFO - Feeding completed in 0.31s (small portion)"
-    manual_pattern = re.compile(r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) - Manual feeding triggered \((\w+) portion\)')
-    scheduled_pattern = re.compile(r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) - Feeding at .* \((\w+) portion\)')
-    completed_pattern = re.compile(r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}),\d+ - INFO - Feeding completed in [\d.]+s \((\w+) portion\)')
-    
-    for line in reversed(lines):
-        line = line.strip()
-        if not line:
-            continue
-        
-        # Try manual feeding pattern
-        match = manual_pattern.match(line)
-        if match:
-            timestamp_str, portion = match.groups()
-            try:
-                timestamp = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
-                if timestamp < cutoff_date:
-                    break
-                
-                activity.append({
-                    'date': format_activity_date(timestamp),
-                    'time': timestamp.strftime("%I:%M %p"),
-                    'portion': portion,
-                    'type': 'manual'
-                })
-            except ValueError:
-                continue
-            
-            if len(activity) >= limit:
-                break
-            continue
-        
-        # Try scheduled feeding pattern
-        match = scheduled_pattern.match(line)
-        if match:
-            timestamp_str, portion = match.groups()
-            try:
-                timestamp = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
-                if timestamp < cutoff_date:
-                    break
-
-                activity.append({
-                    'date': format_activity_date(timestamp),
-                    'time': timestamp.strftime("%I:%M %p"),
-                    'portion': portion,
-                    'type': 'scheduled'
-                })
-            except ValueError:
-                continue
-
-            if len(activity) >= limit:
-                break
-            continue
-
-        # Try completed feeding pattern (Python logging format)
-        match = completed_pattern.match(line)
-        if match:
-            timestamp_str, portion = match.groups()
-            try:
-                timestamp = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
-                if timestamp < cutoff_date:
-                    break
-
-                activity.append({
-                    'date': format_activity_date(timestamp),
-                    'time': timestamp.strftime("%I:%M %p"),
-                    'portion': portion,
-                    'type': 'scheduled'
-                })
-            except ValueError:
-                continue
-
-            if len(activity) >= limit:
-                break
-
-    return activity
-
-
-def format_activity_date(dt):
-    """Format a date for activity display (Today, Yesterday, or date)."""
-    today = datetime.now().date()
-    activity_date = dt.date()
-    
-    if activity_date == today:
-        return "Today"
-    elif activity_date == today - timedelta(days=1):
-        return "Yesterday"
-    elif activity_date >= today - timedelta(days=6):
-        return dt.strftime("%A")  # Day name
-    else:
-        return dt.strftime("%b %d")  # "Jan 05"
-
-
-def parse_weekly_stats():
-    """Aggregate feeding data for the last 7 days by portion size."""
-    lines = read_all_log_lines()
-    if not lines:
-        return []
-
-    today = datetime.now().date()
-    stats = {}
-    for i in range(6, -1, -1):
-        d = today - timedelta(days=i)
-        stats[d.isoformat()] = {
-            'date': d.isoformat(),
-            'day_label': d.strftime('%a'),
-            'is_today': d == today,
-            'small': 0, 'medium': 0, 'large': 0,
-            'total_cups': 0.0,
-            'manual_count': 0,
-            'total_feedings': 0
-        }
-
-    cups_map = {'small': 0.25, 'medium': 0.50, 'large': 0.75}
-    manual_pat = re.compile(r'^(\d{4}-\d{2}-\d{2}) \d{2}:\d{2}:\d{2} - Manual feeding triggered \((\w+) portion\)')
-    sched_pat = re.compile(r'^(\d{4}-\d{2}-\d{2}) \d{2}:\d{2}:\d{2} - Feeding at .* \((\w+) portion\)')
-    # Python logging format: "2026-05-10 04:00:00,391 - INFO - Feeding completed in 0.31s (small portion)"
-    completed_pat = re.compile(r'^(\d{4}-\d{2}-\d{2}) \d{2}:\d{2}:\d{2},\d+ - INFO - Feeding completed in [\d.]+s \((\w+) portion\)')
-
-    for line in lines:
-        stripped = line.strip()
-        manual_match = manual_pat.match(stripped)
-        sched_match = sched_pat.match(stripped) or completed_pat.match(stripped)
-        match = manual_match or sched_match
-        if match:
-            date_str, portion = match.groups()
-            if date_str in stats and portion in cups_map:
-                stats[date_str][portion] += 1
-                stats[date_str]['total_cups'] += cups_map[portion]
-                stats[date_str]['total_feedings'] += 1
-                if manual_match:
-                    stats[date_str]['manual_count'] += 1
-
-    return list(stats.values())
-
-
-def build_week_summary(weekly_stats):
-    """Build a one-line summary of the week's feeding activity."""
-    total_manual = sum(d['manual_count'] for d in weekly_stats)
-    total_feedings = sum(d['total_feedings'] for d in weekly_stats)
-    if total_feedings == 0:
-        return None
-    if total_manual == 0:
-        return "All feedings on schedule"
-    manual_label = "1 manual feed" if total_manual == 1 else f"{total_manual} manual feeds"
-    return f"{manual_label} this week"
-
-
-def calculate_consumption_rate(weekly_stats):
-    """Calculate consumption rate from weekly data."""
-    total_cups = sum(d['total_cups'] for d in weekly_stats)
-    days_with_data = sum(1 for d in weekly_stats if d['total_feedings'] > 0)
-    if days_with_data == 0:
-        return None
-    daily_avg = total_cups / days_with_data
-    weekly_avg = daily_avg * 7
-    monthly_avg = daily_avg * 30
-    lbs_per_cup = 0.25  # ~4 oz dry kibble per cup, 16 oz per lb
-    return {
-        'daily_cups': round(daily_avg, 2),
-        'daily_lbs': round(daily_avg * lbs_per_cup, 2),
-        'weekly_cups': round(weekly_avg, 1),
-        'weekly_lbs': round(weekly_avg * lbs_per_cup, 1),
-        'monthly_cups': round(monthly_avg, 1),
-        'monthly_lbs': round(monthly_avg * lbs_per_cup, 1),
-    }
 
 
 # Configure logging
@@ -425,35 +208,11 @@ def index():
 def day_detail(date_str):
     """Return feeding details for a specific date (YYYY-MM-DD)."""
     try:
-        target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        datetime.strptime(date_str, "%Y-%m-%d")
     except ValueError:
         return jsonify({'success': False, 'error': 'Invalid date format'}), 400
 
-    lines = read_all_log_lines()
-    cups_map = {'small': 0.25, 'medium': 0.50, 'large': 0.75}
-    manual_pat = re.compile(r'^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}) - Manual feeding triggered \((\w+) portion\)')
-    completed_pat = re.compile(r'^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}),\d+ - INFO - Feeding completed in [\d.]+s \((\w+) portion\)')
-
-    feedings = []
-    for line in lines:
-        stripped = line.strip()
-        manual_match = manual_pat.match(stripped)
-        completed_match = completed_pat.match(stripped)
-        match = manual_match or completed_match
-        if match:
-            d, t, portion = match.groups()
-            if d == date_str and portion in cups_map:
-                h, m, s = t.split(':')
-                hour = int(h)
-                time_12h = f"{hour % 12 or 12}:{m} {'AM' if hour < 12 else 'PM'}"
-                feedings.append({
-                    'time': time_12h,
-                    'portion': portion,
-                    'cups': cups_map[portion],
-                    'type': 'manual' if manual_match else 'scheduled'
-                })
-
-    total_cups = sum(f['cups'] for f in feedings)
+    feedings, total_cups = day_feedings(date_str)
     return jsonify({
         'success': True,
         'date': date_str,
