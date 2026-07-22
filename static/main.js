@@ -351,13 +351,15 @@ function initAjaxForms() {
     // Hopper refill — reveal the estimate form, then AJAX submit
     const refillToggle = document.getElementById('refill-toggle');
     const refillForm = document.querySelector('.refill-form');
-    refillToggle?.addEventListener('click', () => {
-        refillForm.hidden = !refillForm.hidden;
-    });
-    refillForm?.addEventListener('submit', function(e) {
-        e.preventDefault();
-        submitForm(this);
-    });
+    if (refillToggle && refillForm) {
+        refillToggle.addEventListener('click', () => {
+            refillForm.hidden = !refillForm.hidden;
+        });
+        refillForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            submitForm(this);
+        });
+    }
 }
 
 // ===== Countdown Timer =====
