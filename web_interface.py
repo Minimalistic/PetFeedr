@@ -7,7 +7,7 @@ import json
 import glob
 import logging
 from threading import Thread
-from PetFeedr import feed_pet, load_todays_schedule, save_todays_schedule, apply_random_offset, TODAYS_SCHEDULE_FILE
+from feeder_core import feed_pet, load_todays_schedule, save_todays_schedule, apply_random_offset, TODAYS_SCHEDULE_FILE
 from servo_controller import PORTION_SIZES, DEFAULT_PORTION
 from DRV8825 import SIMULATION_MODE
 
