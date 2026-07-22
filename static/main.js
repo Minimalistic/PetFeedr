@@ -348,12 +348,19 @@ function initAjaxForms() {
         });
     });
 
-    // Hopper refill — reveal the estimate form, then AJAX submit
+    // Hopper refill — swap the button for the estimate form so only one
+    // commit action is visible at a time, then AJAX submit
     const refillToggle = document.getElementById('refill-toggle');
     const refillForm = document.querySelector('.refill-form');
+    const refillCancel = document.getElementById('refill-cancel');
     if (refillToggle && refillForm) {
         refillToggle.addEventListener('click', () => {
-            refillForm.hidden = !refillForm.hidden;
+            refillToggle.hidden = true;
+            refillForm.hidden = false;
+        });
+        refillCancel?.addEventListener('click', () => {
+            refillForm.hidden = true;
+            refillToggle.hidden = false;
         });
         refillForm.addEventListener('submit', function(e) {
             e.preventDefault();

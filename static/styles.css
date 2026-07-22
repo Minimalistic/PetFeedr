@@ -1470,6 +1470,11 @@ body {
     color: var(--color-text-muted);
 }
 
+.refill-actions {
+    display: flex;
+    gap: 8px;
+}
+
 .refill-form select {
     padding: 8px;
     border-radius: var(--radius-sm);

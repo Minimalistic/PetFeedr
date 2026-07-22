@@ -178,6 +178,12 @@ def index():
             hopper_status['last_refill'], "%Y-%m-%d").strftime("%b %d")
     except (ValueError, TypeError):
         hopper_status['last_refill_label'] = hopper_status['last_refill']
+    # Preselect the "what was left" guess nearest the app's own level estimate,
+    # so the form confirms its guess instead of quizzing from scratch
+    level = hopper_status.get('level')
+    hopper_status['refill_default'] = (
+        min([0, 10, 25, 50, 75], key=lambda c: abs(c - level * 100))
+        if level is not None else 10)
 
     return render_template('index.html',
                            schedules=schedules,

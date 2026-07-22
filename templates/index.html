@@ -312,13 +312,14 @@
                         <form action="/refill" method="post" class="refill-form" hidden>
                             <label for="remaining_pct">How full was it before you refilled?</label>
                             <select id="remaining_pct" name="remaining_pct">
-                                <option value="0">Empty</option>
-                                <option value="10" selected>~10%</option>
-                                <option value="25">~25%</option>
-                                <option value="50">~50%</option>
-                                <option value="75">~75%</option>
+                                {% for val, name in [(0, 'Empty'), (10, '~10%'), (25, '~25%'), (50, '~50%'), (75, '~75%')] %}
+                                    <option value="{{ val }}"{% if val == hopper.refill_default %} selected{% endif %}>{{ name }}</option>
+                                {% endfor %}
                             </select>
-                            <button type="submit" class="btn btn-primary">Save refill</button>
+                            <div class="refill-actions">
+                                <button type="submit" class="btn btn-primary">Log it</button>
+                                <button type="button" class="btn btn-secondary" id="refill-cancel">Cancel</button>
+                            </div>
                         </form>
                     </div>
                 </section>

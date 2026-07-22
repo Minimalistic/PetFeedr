@@ -381,6 +381,20 @@ class TestHopper(unittest.TestCase):
         info = hopper.status()
         self.assertTrue(info['learning'])
 
+    def test_index_preselects_refill_guess_near_estimated_level(self):
+        import hopper
+        import web_interface
+        hopper.record_dispense(9.0)
+        hopper.record_refill(10)     # capacity ~10 cups
+        hopper.record_dispense(4.0)  # level 0.6 → nearest choice is 50
+        html = web_interface.app.test_client().get('/').data.decode()
+        self.assertIn('<option value="50" selected>', html)
+
+    def test_index_refill_guess_defaults_to_10_while_learning(self):
+        import web_interface
+        html = web_interface.app.test_client().get('/').data.decode()
+        self.assertIn('<option value="10" selected>', html)
+
     def test_refill_route_validates_percentage(self):
         import web_interface
         client = web_interface.app.test_client()
