@@ -355,6 +355,19 @@ class TestHopper(unittest.TestCase):
         state = hopper.record_refill(50)
         self.assertIsNone(hopper.capacity_cups(state))
 
+    def test_refill_after_trivial_consumption_resets_but_learns_nothing(self):
+        import hopper
+        hopper.record_dispense(0.5)  # below MIN_LEARN_CUPS
+        state = hopper.record_refill(10)
+        self.assertIsNone(hopper.capacity_cups(state))
+        self.assertEqual(state['cups_since_refill'], 0.0)
+
+    def test_refill_at_learning_floor_still_learns(self):
+        import hopper
+        hopper.record_dispense(hopper.MIN_LEARN_CUPS)
+        state = hopper.record_refill(0)  # emptied → capacity = cups dispensed
+        self.assertAlmostEqual(hopper.capacity_cups(state), hopper.MIN_LEARN_CUPS)
+
     def test_capacity_is_median_of_recent_estimates(self):
         import hopper
         for est_source in [(7.5, 25), (10.0, 0), (20.0, 0)]:  # → 10, 10, 20

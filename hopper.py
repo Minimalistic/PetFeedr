@@ -19,6 +19,7 @@ log = logging.getLogger('petfeedr')
 
 HOPPER_FILE = 'hopper.json'
 ESTIMATES_KEPT = 5
+MIN_LEARN_CUPS = 2.0  # skip learning from refills after trivial consumption — tiny counters yield garbage capacity estimates
 LOW_DAYS = 2       # alert when predicted days of food left drops to this
 LOW_LEVEL = 0.15   # ...or when estimated fill level drops below this
 
@@ -63,10 +64,15 @@ def record_dispense(cups):
 
 
 def record_refill(remaining_pct):
-    """Record a refill. remaining_pct: rough % still full beforehand (0-95)."""
+    """Record a refill. remaining_pct: rough % still full beforehand (0-95).
+
+    Always resets the counter; only learns capacity when at least
+    MIN_LEARN_CUPS were dispensed since the last refill (a double top-up
+    or accidental log would otherwise poison the estimates).
+    """
     state = load_state()
     consumed_fraction = 1 - remaining_pct / 100
-    if consumed_fraction > 0 and state['cups_since_refill'] > 0:
+    if consumed_fraction > 0 and state['cups_since_refill'] >= MIN_LEARN_CUPS:
         estimate = state['cups_since_refill'] / consumed_fraction
         state['capacity_estimates'] = (
             state['capacity_estimates'] + [round(estimate, 2)])[-ESTIMATES_KEPT:]
