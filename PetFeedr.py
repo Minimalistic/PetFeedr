@@ -1,37 +1,36 @@
 #!/usr/bin/env python3
 
-import logging
 import schedule
 import subprocess
 import time
 from datetime import date
 
-from feeder_core import load_and_schedule_feedings
+from feeder_core import load_and_schedule_feedings, log, setup_logging
 from DRV8825 import SIMULATION_MODE
 
 
 def run():
     """Main run loop - loads schedules and runs them."""
-    logging.info("Starting to load feeding times from file.")
+    log.info("Starting to load feeding times from file.")
 
     try:
         load_and_schedule_feedings()
-        logging.info("Finished loading feeding times from file.")
+        log.info("Finished loading feeding times from file.")
     except Exception as e:
-        logging.error(f"Error reading feeding_schedules.txt: {str(e)}")
+        log.error(f"Error reading feeding_schedules.txt: {str(e)}")
 
-    logging.info("Starting schedule execution.")
+    log.info("Starting schedule execution.")
     last_date = date.today()
 
     while True:
         # Check if it's a new day - regenerate randomized schedule
         if date.today() != last_date:
-            logging.info("New day detected - regenerating schedule with fresh randomization")
+            log.info("New day detected - regenerating schedule with fresh randomization")
             try:
                 load_and_schedule_feedings()
                 last_date = date.today()
             except Exception as e:
-                logging.error(f"Error regenerating schedule: {e}")
+                log.error(f"Error regenerating schedule: {e}")
 
         schedule.run_pending()
         time.sleep(1)
@@ -43,14 +42,15 @@ def run_web_interface():
 
 
 def main():
+    setup_logging()
     if SIMULATION_MODE:
-        logging.info("=" * 50)
-        logging.info("🔧 PETFEEDR RUNNING IN SIMULATION MODE")
-        logging.info("   No hardware will be touched!")
-        logging.info("=" * 50)
+        log.info("=" * 50)
+        log.info("🔧 PETFEEDR RUNNING IN SIMULATION MODE")
+        log.info("   No hardware will be touched!")
+        log.info("=" * 50)
 
     run_web_interface()
-    logging.info("PetFeedr started successfully!")
+    log.info("PetFeedr started successfully!")
     run()
 
 

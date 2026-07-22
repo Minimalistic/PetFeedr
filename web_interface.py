@@ -2,9 +2,9 @@
 
 import os
 import time
-import logging
 from threading import Thread
-from feeder_core import feed_pet, load_todays_schedule, save_todays_schedule, apply_random_offset, TODAYS_SCHEDULE_FILE
+from feeder_core import (feed_pet, load_todays_schedule, save_todays_schedule,
+                         apply_random_offset, TODAYS_SCHEDULE_FILE, log, setup_logging)
 from feeding_stats import (parse_recent_activity, parse_weekly_stats, build_week_summary,
                            calculate_consumption_rate, calculate_daily_total, day_feedings)
 from servo_controller import PORTION_SIZES, DEFAULT_PORTION
@@ -86,7 +86,7 @@ def read_schedules_with_details():
                 'sort_key': actual_dt
             })
         except ValueError:
-            logging.error(f"Error parsing time: {time_str}")
+            log.error(f"Error parsing time: {time_str}")
             continue
     
     # Sort by actual time
@@ -130,11 +130,6 @@ def mark_past_feedings(schedules):
             sched['is_next'] = False
     
     return schedules
-
-
-# Configure logging
-logging.basicConfig(filename='feeding_log.txt', level=logging.INFO,
-    format='%(asctime)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
 
 def run_schedule():
@@ -277,16 +272,16 @@ def add_job():
         actual_time_12h = datetime.strptime(actual_time, "%H:%M").strftime("%I:%M %p")
         
         if is_fixed:
-            logging.info(f"Added feeding time: {feeding_time_12h} ({portion} portion) (fixed)")
+            log.info(f"Added feeding time: {feeding_time_12h} ({portion} portion) (fixed)")
         else:
-            logging.info(f"Added feeding time: {feeding_time_12h} → {actual_time_12h} ({portion} portion)")
+            log.info(f"Added feeding time: {feeding_time_12h} → {actual_time_12h} ({portion} portion)")
 
         if wants_json():
             return jsonify({'success': True, 'message': f'Added {feeding_time_12h} feeding'})
         return redirect('/')
 
     except Exception as e:
-        logging.error(f"Error writing to feeding_schedules.txt: {str(e)}")
+        log.error(f"Error writing to feeding_schedules.txt: {str(e)}")
         if wants_json():
             return jsonify({'success': False, 'message': 'Error adding feeding time'}), 500
         return "An error occurred while adding the feeding time.", 500
@@ -309,12 +304,12 @@ def delete_job():
         todays_schedule = [s for s in todays_schedule if s['base_time'] != base_time]
         save_todays_schedule(todays_schedule)
 
-        logging.info(f"Deleted feeding time: {base_time}")
+        log.info(f"Deleted feeding time: {base_time}")
         if wants_json():
             return jsonify({'success': True, 'message': 'Feeding deleted'})
         return redirect('/')
     except Exception as e:
-        logging.error(f"Error deleting feeding time: {str(e)}")
+        log.error(f"Error deleting feeding time: {str(e)}")
         if wants_json():
             return jsonify({'success': False, 'message': 'Error deleting feeding time'}), 500
         return "An error occurred while deleting the feeding time.", 500
@@ -381,7 +376,7 @@ def toggle_fixed():
             return jsonify({'success': True, 'message': f'Feeding set to {status}'})
         return redirect('/')
     except Exception as e:
-        logging.error(f"Error toggling fixed status: {str(e)}")
+        log.error(f"Error toggling fixed status: {str(e)}")
         if wants_json():
             return jsonify({'success': False, 'message': 'Error toggling fixed status'}), 500
         return "An error occurred.", 500
@@ -417,12 +412,12 @@ def update_portion():
         with open('feeding_schedules.txt', 'w') as file:
             file.writelines(new_lines)
         
-        logging.info(f"Updated portion for {base_time} to {new_portion}")
+        log.info(f"Updated portion for {base_time} to {new_portion}")
         if wants_json():
             return jsonify({'success': True, 'message': f'Portion updated to {new_portion}'})
         return redirect('/')
     except Exception as e:
-        logging.error(f"Error updating portion: {str(e)}")
+        log.error(f"Error updating portion: {str(e)}")
         if wants_json():
             return jsonify({'success': False, 'message': 'Error updating portion'}), 500
         return "An error occurred.", 500
@@ -436,7 +431,7 @@ def trigger_feeding():
         portion = DEFAULT_PORTION
     
     feed_pet(portion=portion)
-    logging.info(f"Manual feeding triggered ({portion} portion)")
+    log.info(f"Manual feeding triggered ({portion} portion)")
     if wants_json():
         return jsonify({'success': True, 'message': f'Dispensed {portion} portion'})
     return redirect('/')
@@ -452,9 +447,10 @@ def service_worker():
 
 
 def main():
+    setup_logging()
     schedule_thread = Thread(target=run_schedule)
     schedule_thread.start()
-    logging.info(f"Starting web interface on port {WEB_PORT}")
+    log.info(f"Starting web interface on port {WEB_PORT}")
     app.run(host='0.0.0.0', port=WEB_PORT, debug=os.environ.get('FLASK_DEBUG', 'false').lower() == 'true')
 
 

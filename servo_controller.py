@@ -2,6 +2,9 @@ import time
 import logging
 from DRV8825 import DRV8825, SIMULATION_MODE
 
+# Shared app logger by name — importing it from feeder_core would be circular
+log = logging.getLogger('petfeedr')
+
 # Base unit calibration (2026-01-11)
 # One dispense cycle = 100 steps ≈ 1/4 cup
 BASE_STEPS = 100
@@ -55,11 +58,11 @@ def trigger_servo(portion='small'):
         # Use 1/16 microstepping for quieter operation and better torque management
         Motor1.SetMicroStep('softward', '1/16step')
 
-        logging.info(f"Dispensing {portion} portion ({portion_desc}) - {num_cycles} cycle(s)")
+        log.info(f"Dispensing {portion} portion ({portion_desc}) - {num_cycles} cycle(s)")
 
         for cycle in range(num_cycles):
             if num_cycles > 1:
-                logging.info(f"  Cycle {cycle + 1}/{num_cycles}")
+                log.info(f"  Cycle {cycle + 1}/{num_cycles}")
             
             # 1. Agitation: Rotate backward slightly to dislodge any jams
             Motor1.TurnStep(Dir='backward', steps=AGITATION_STEPS, stepdelay=0.0005)
@@ -75,17 +78,17 @@ def trigger_servo(portion='small'):
 
         elapsed = time.time() - start_time
         if SIMULATION_MODE:
-            logging.info(f"[SIM] ✅ Feeding completed in {elapsed:.2f}s ({portion} portion)")
+            log.info(f"[SIM] ✅ Feeding completed in {elapsed:.2f}s ({portion} portion)")
         else:
-            logging.info(f"Feeding completed in {elapsed:.2f}s ({portion} portion)")
+            log.info(f"Feeding completed in {elapsed:.2f}s ({portion} portion)")
 
     except Exception as e:
-        logging.exception("An error occurred while triggering the servo:")
+        log.exception("An error occurred while triggering the servo:")
         if Motor1:
             Motor1.Stop()
-            logging.info("Motor stopped due to an exception")
+            log.info("Motor stopped due to an exception")
 
     finally:
         if Motor1:
             Motor1.Stop()
-            logging.debug("Motor stopped and cleaned up")
+            log.debug("Motor stopped and cleaned up")

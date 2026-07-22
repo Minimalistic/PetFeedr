@@ -2,6 +2,8 @@ import os
 import time
 import logging
 
+log = logging.getLogger('petfeedr')
+
 # Determine if we're running in simulation mode
 # Auto-detect: if RPi.GPIO isn't available, we're not on a Pi
 # Manual override: set PETFEEDR_SIMULATE=true to force simulation
@@ -14,10 +16,10 @@ if not SIMULATION_MODE:
         # RPi.GPIO not available - automatically switch to simulation
         import mock_gpio as GPIO
         SIMULATION_MODE = True
-        logging.info("🔧 RPi.GPIO not found - running in SIMULATION mode")
+        log.info("🔧 RPi.GPIO not found - running in SIMULATION mode")
 else:
     import mock_gpio as GPIO
-    logging.info("🔧 PETFEEDR_SIMULATE=true - running in SIMULATION mode")
+    log.info("🔧 PETFEEDR_SIMULATE=true - running in SIMULATION mode")
 
 MotorDir = [
     'forward',
@@ -68,7 +70,7 @@ class DRV8825():
                      '1/32step': (1, 0, 1)}
 
         if self.simulation_mode:
-            logging.info(f"[SIM] Motor microstep set to: {stepformat}")
+            log.info(f"[SIM] Motor microstep set to: {stepformat}")
         else:
             print("Control mode:", mode)
             
@@ -81,7 +83,7 @@ class DRV8825():
         # In simulation mode, just log what would happen
         if self.simulation_mode:
             duration = steps * stepdelay * 2
-            logging.info(f"[SIM] 🔄 Motor turning {Dir} for {steps} steps "
+            log.info(f"[SIM] 🔄 Motor turning {Dir} for {steps} steps "
                         f"(would take {duration:.2f}s)")
             # Brief delay to simulate some work without wasting time
             time.sleep(0.1)

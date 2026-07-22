@@ -14,18 +14,40 @@ from logging.handlers import TimedRotatingFileHandler
 from datetime import datetime, timedelta, date
 from servo_controller import trigger_servo, PORTION_SIZES, DEFAULT_PORTION
 
-# Configure logging
-log_file = 'feeding_log.txt'
-handler = TimedRotatingFileHandler(log_file, when='D', backupCount=14)
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-handler.setFormatter(formatter)
-logging.getLogger('').addHandler(handler)
-logging.getLogger('').setLevel(logging.INFO)
+# App logger: owns feeding_log.txt. propagate=False keeps werkzeug/root
+# noise out of the feed log; root still gets a console handler so HTTP
+# access lines reach stderr (journald under systemd).
+log = logging.getLogger('petfeedr')
 
-# Also log to console for easier development
-console_handler = logging.StreamHandler()
-console_handler.setFormatter(formatter)
-logging.getLogger('').addHandler(console_handler)
+LOG_FILE = 'feeding_log.txt'
+
+
+def setup_logging(console_only=False):
+    """Configure the petfeedr logger. Idempotent; called from entry points
+    only (not at import) so tests and tooling don't touch the log file.
+
+    console_only: dev/standalone mode — skip the file handler so a second
+    process can never race the service's midnight rotation.
+    """
+    if log.handlers:
+        return
+    log.setLevel(logging.INFO)
+    log.propagate = False
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+    log.addHandler(console_handler)
+
+    if not console_only:
+        # 'midnight' (not 'D') so rotation aligns with calendar days —
+        # the daily stats assume file boundaries fall at 00:00.
+        file_handler = TimedRotatingFileHandler(LOG_FILE, when='midnight', backupCount=14)
+        file_handler.setFormatter(formatter)
+        log.addHandler(file_handler)
+
+    # Root catches everything else (werkzeug) on stderr only.
+    logging.basicConfig(level=logging.INFO)
 
 # File to store today's randomized schedule (for web UI display)
 TODAYS_SCHEDULE_FILE = 'todays_schedule.json'
@@ -35,12 +57,12 @@ def feed_pet(portion=DEFAULT_PORTION):
     """Feed the pet with the specified portion size."""
     try:
         trigger_servo(portion=portion)
-        logging.info("Triggering Servo to feed the pet")
-        logging.info(" > ^ <")
-        logging.info("( o.o ) Food dispensed successfully!")
-        logging.info(" /\\_/\\💕")
+        log.info("Triggering Servo to feed the pet")
+        log.info(" > ^ <")
+        log.info("( o.o ) Food dispensed successfully!")
+        log.info(" /\\_/\\💕")
     except Exception as e:
-        logging.error(f"Error feeding pet: {str(e)}")
+        log.error(f"Error feeding pet: {str(e)}")
 
 
 def parse_schedule_line(line):
@@ -112,7 +134,7 @@ def load_and_schedule_feedings():
 
     if not os.path.isfile('feeding_schedules.txt'):
         open('feeding_schedules.txt', 'w').close()
-        logging.info("feeding_schedules.txt not found. An empty file has been created.")
+        log.info("feeding_schedules.txt not found. An empty file has been created.")
         return []
 
     todays_schedule = []
@@ -122,7 +144,7 @@ def load_and_schedule_feedings():
         lines = file.readlines()
 
     if len(lines) == 0:
-        logging.warning("feeding_schedules.txt is empty. Starting with an empty schedule.")
+        log.warning("feeding_schedules.txt is empty. Starting with an empty schedule.")
         return []
 
     for line in lines:
@@ -135,10 +157,10 @@ def load_and_schedule_feedings():
         # Apply randomization if not fixed
         if not is_fixed:
             actual_time = apply_random_offset(time_str, range_minutes, scheduled_times)
-            logging.info(f"Randomized: {time_str} → {actual_time} ({portion} portion)")
+            log.info(f"Randomized: {time_str} → {actual_time} ({portion} portion)")
         else:
             actual_time = time_str
-            logging.info(f"Fixed time: {actual_time} ({portion} portion)")
+            log.info(f"Fixed time: {actual_time} ({portion} portion)")
 
         # Track this time for conflict avoidance
         scheduled_times.append(datetime.strptime(actual_time, "%H:%M"))
@@ -171,7 +193,7 @@ def save_todays_schedule(schedule_data):
         with open(TODAYS_SCHEDULE_FILE, 'w') as f:
             json.dump(data, f, indent=2)
     except Exception as e:
-        logging.error(f"Error saving today's schedule: {e}")
+        log.error(f"Error saving today's schedule: {e}")
 
 
 def load_todays_schedule():
@@ -189,5 +211,5 @@ def load_todays_schedule():
         else:
             return None  # Needs regeneration for new day
     except Exception as e:
-        logging.error(f"Error loading today's schedule: {e}")
+        log.error(f"Error loading today's schedule: {e}")
         return None
