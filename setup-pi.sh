@@ -11,6 +11,11 @@ SERVICE_FILE="/etc/systemd/system/petfeedr.service"
 echo "🐱 PetFeedr Pi Setup"
 echo "===================="
 
+# Feedings fire on the system clock — a wrong timezone shifts every meal
+# (learned the hard way: OS image defaulted to Eastern, cat ate an hour early)
+echo "🕐 Setting timezone..."
+sudo timedatectl set-timezone America/Chicago
+
 # Create the systemd service file
 echo "📝 Creating systemd service..."
 sudo tee "$SERVICE_FILE" > /dev/null << EOF
