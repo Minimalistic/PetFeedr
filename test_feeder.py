@@ -3,6 +3,7 @@
 Run: python3 -m unittest
 """
 
+import json
 import os
 import tempfile
 import unittest
@@ -203,7 +204,20 @@ class TestTotals(unittest.TestCase):
             feeding_stats.parse_weekly_stats(lines=["\n"])))
 
 
-class TestFailureHandling(unittest.TestCase):
+class TempCwd(unittest.TestCase):
+    """Run in a scratch directory so tests never touch the repo's runtime files."""
+
+    def setUp(self):
+        self._olddir = os.getcwd()
+        self._tmp = tempfile.TemporaryDirectory()
+        os.chdir(self._tmp.name)
+
+    def tearDown(self):
+        os.chdir(self._olddir)
+        self._tmp.cleanup()
+
+
+class TestFailureHandling(TempCwd):
     def test_notify_unconfigured_is_noop(self):
         import notify
         with patch.dict(os.environ, {}, clear=False):
@@ -241,7 +255,7 @@ class TestFailureHandling(unittest.TestCase):
             self.assertIn("large portion, manual", mock_send.call_args[0][0])
 
     def test_feed_pet_success_returns_true_without_notifying(self):
-        with patch('feeder_core.trigger_servo'), \
+        with patch('feeder_core.trigger_servo', return_value=0.2), \
              patch('feeder_core.notify.send') as mock_send:
             self.assertTrue(feeder_core.feed_pet())
             mock_send.assert_not_called()
@@ -319,17 +333,8 @@ class TestResync(unittest.TestCase):
         self.assertEqual(feeder_core.load_todays_schedule(), [])
 
 
-class TestHopper(unittest.TestCase):
-    """Hopper learning and low-warning logic (runs in a temp cwd)."""
-
-    def setUp(self):
-        self._olddir = os.getcwd()
-        self._tmp = tempfile.TemporaryDirectory()
-        os.chdir(self._tmp.name)
-
-    def tearDown(self):
-        os.chdir(self._olddir)
-        self._tmp.cleanup()
+class TestHopper(TempCwd):
+    """Hopper learning and low-warning logic."""
 
     def test_fresh_state_is_learning(self):
         import hopper
@@ -424,3 +429,103 @@ class TestHopper(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class TestEventJournal(TempCwd):
+    """feeding_events.jsonl: the durable per-event record."""
+
+    def test_dispense_event_carries_numbers_and_hopper_counter(self):
+        import events
+        with patch('feeder_core.trigger_servo', return_value=0.31), \
+             patch('feeder_core.notify.send'):
+            feeder_core.feed_pet(portion='medium', base_time='07:00', scheduled_for='07:28')
+        (ev,) = events.read_all()
+        self.assertEqual(ev['event'], 'dispense')
+        self.assertEqual(ev['portion'], 'medium')
+        self.assertEqual(ev['cups'], feeding_stats.PORTION_CUPS['medium'])
+        self.assertEqual(ev['source'], 'scheduled')
+        self.assertEqual(ev['duration_s'], 0.31)
+        self.assertEqual((ev['base_time'], ev['scheduled_for']), ('07:00', '07:28'))
+        self.assertEqual(ev['hopper_cups'], feeding_stats.PORTION_CUPS['medium'])
+        self.assertTrue(ev['sim'])  # test box has no GPIO — analysis must be able to filter this
+        datetime.fromisoformat(ev['ts'])
+
+    def test_manual_dispense_has_no_schedule_times(self):
+        import events
+        with patch('feeder_core.trigger_servo', return_value=0.2), \
+             patch('feeder_core.notify.send'):
+            feeder_core.feed_pet(portion='small', source='manual')
+        (ev,) = events.read_all()
+        self.assertEqual(ev['source'], 'manual')
+        self.assertIsNone(ev['base_time'])
+        self.assertIsNone(ev['scheduled_for'])
+
+    def test_failure_event_records_error(self):
+        import events
+        with patch('feeder_core.trigger_servo', side_effect=RuntimeError("jam")), \
+             patch('feeder_core.notify.send'):
+            feeder_core.feed_pet(portion='large', source='manual')
+        (ev,) = events.read_all()
+        self.assertEqual(ev['event'], 'failure')
+        self.assertEqual(ev['error'], 'jam')
+        self.assertEqual(ev['portion'], 'large')
+
+    def test_refill_event_records_estimate(self):
+        import events, hopper
+        for _ in range(4):
+            hopper.record_dispense(2.5)
+        hopper.record_refill(25)
+        ev = events.read_all()[-1]
+        self.assertEqual(ev['event'], 'refill')
+        self.assertEqual(ev['remaining_pct'], 25)
+        self.assertEqual(ev['cups_before'], 10.0)
+        self.assertEqual(ev['capacity_estimate'], 13.33)
+        self.assertEqual(ev['capacity'], 13.33)
+
+    def test_refill_after_trivial_consumption_records_no_estimate(self):
+        import events, hopper
+        hopper.record_dispense(0.5)
+        hopper.record_refill(50)
+        ev = events.read_all()[-1]
+        self.assertIsNone(ev['capacity_estimate'])
+        self.assertIsNone(ev['capacity'])
+
+    def test_low_event_written_once_per_cycle(self):
+        import events, hopper
+        with open(hopper.HOPPER_FILE, 'w') as f:
+            # 7 of 8 cups gone → level 0.125 (exact in binary, so days_left is a clean 2)
+            json.dump({'last_refill': '2026-01-01', 'cups_since_refill': 7.0,
+                       'capacity_estimates': [8.0], 'low_notified': False}, f)
+        self.assertIsNotNone(hopper.check_low(daily_avg_cups=0.5))
+        self.assertIsNone(hopper.check_low(daily_avg_cups=0.5))
+        lows = [e for e in events.read_all() if e['event'] == 'hopper_low']
+        self.assertEqual(len(lows), 1)
+        self.assertEqual(lows[0]['level'], 0.12)
+        self.assertEqual(lows[0]['days_left'], 2)
+
+    def test_write_failure_does_not_break_feeding(self):
+        import events
+        with patch('events.open', side_effect=OSError("disk full")), \
+             patch('feeder_core.trigger_servo', return_value=0.2), \
+             patch('feeder_core.notify.send'):
+            self.assertTrue(feeder_core.feed_pet())
+
+    def test_read_all_skips_malformed_lines(self):
+        import events
+        events.record('dispense', portion='small')
+        with open(events.EVENTS_FILE, 'a') as f:
+            f.write('not json\n')
+        events.record('refill', remaining_pct=10)
+        self.assertEqual([e['event'] for e in events.read_all()], ['dispense', 'refill'])
+
+    def test_missing_file_reads_empty(self):
+        import events
+        self.assertEqual(events.read_all(), [])
+
+    def test_unserializable_field_does_not_break_feeding(self):
+        import events
+        with patch('feeder_core.trigger_servo', return_value=object()), \
+             patch('feeder_core.notify.send'):
+            self.assertTrue(feeder_core.feed_pet())
+        (ev,) = events.read_all()
+        self.assertIsNone(ev['duration_s'])

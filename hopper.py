@@ -14,6 +14,7 @@ import json
 import logging
 from datetime import date
 from statistics import median
+import events
 
 log = logging.getLogger('petfeedr')
 
@@ -72,14 +73,18 @@ def record_refill(remaining_pct):
     """
     state = load_state()
     consumed_fraction = 1 - remaining_pct / 100
-    if consumed_fraction > 0 and state['cups_since_refill'] >= MIN_LEARN_CUPS:
-        estimate = state['cups_since_refill'] / consumed_fraction
+    cups_before = state['cups_since_refill']
+    estimate = None
+    if consumed_fraction > 0 and cups_before >= MIN_LEARN_CUPS:
+        estimate = round(cups_before / consumed_fraction, 2)
         state['capacity_estimates'] = (
-            state['capacity_estimates'] + [round(estimate, 2)])[-ESTIMATES_KEPT:]
+            state['capacity_estimates'] + [estimate])[-ESTIMATES_KEPT:]
     state['cups_since_refill'] = 0.0
     state['last_refill'] = date.today().isoformat()
     state['low_notified'] = False
     save_state(state)
+    events.record('refill', remaining_pct=remaining_pct, cups_before=cups_before,
+                  capacity_estimate=estimate, capacity=capacity_cups(state))
     return state
 
 
@@ -118,6 +123,8 @@ def check_low(daily_avg_cups=None):
     if level <= LOW_LEVEL or (days_left is not None and days_left <= LOW_DAYS):
         state['low_notified'] = True
         save_state(state)
+        events.record('hopper_low', level=round(level, 2),
+                      days_left=int(days_left) if days_left is not None else None)
         if days_left is not None:
             return f"Hopper low — about {level:.0%} left (~{int(days_left)} days of food)"
         return f"Hopper low — about {level:.0%} left"

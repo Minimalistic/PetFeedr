@@ -17,6 +17,7 @@ from servo_controller import trigger_servo, PORTION_SIZES, DEFAULT_PORTION
 from feeding_stats import PORTION_CUPS, parse_weekly_stats, calculate_consumption_rate
 import hopper
 import notify
+import events
 
 # One lock for everything that touches the schedule files, the job registry,
 # or the motor. The `schedule` library has no thread safety of its own, and
@@ -63,40 +64,51 @@ def setup_logging(console_only=False):
 TODAYS_SCHEDULE_FILE = 'todays_schedule.json'
 
 
-def feed_pet(portion=DEFAULT_PORTION, source='scheduled'):
+def feed_pet(portion=DEFAULT_PORTION, source='scheduled', base_time=None, scheduled_for=None):
     """Feed the pet with the specified portion size. Returns True on success.
 
     Locked so a manual feed (Flask thread) can never drive the motor
     concurrently with a scheduled feed (main thread). The servo's
-    "Feeding completed" line is the log record the stats parse.
+    "Feeding completed" line is the log record the stats parse; the
+    event journal gets the same dispense with its numbers (base_time and
+    scheduled_for are the schedule's HH:MM pair, None for manual feeds).
 
     A dispense failure is the worst failure mode this device has — a
     silently unfed pet — so it pushes a phone notification, not just a log.
     """
     with STATE_LOCK:
         try:
-            trigger_servo(portion=portion, source=source)
+            duration = trigger_servo(portion=portion, source=source)
         except Exception as e:
             log.exception(f"Feeding failed ({portion} portion, {source}): {e}")
             notify.send(f"Feeding FAILED ({portion} portion, {source}): {e} — "
                         "the motor may be jammed.", priority=1)
+            events.record('failure', portion=portion, source=source, error=str(e))
             return False
-        _track_hopper(portion)
+        cups = PORTION_CUPS.get(portion, 0.25)
+        hopper_cups = _track_hopper(cups)
+        events.record('dispense', portion=portion, cups=cups, source=source,
+                      duration_s=round(duration, 2) if isinstance(duration, (int, float)) else None,
+                      base_time=base_time, scheduled_for=scheduled_for,
+                      hopper_cups=hopper_cups)
         return True
 
 
-def _track_hopper(portion):
+def _track_hopper(cups):
     """Count the dispense toward hopper level; warn once when running low.
+    Returns the counter after this dispense (None if tracking failed).
     Tracking must never break a feeding that already succeeded."""
     try:
-        hopper.record_dispense(PORTION_CUPS.get(portion, 0.25))
+        state = hopper.record_dispense(cups)
         rate = calculate_consumption_rate(parse_weekly_stats())
         message = hopper.check_low(rate['daily_cups'] if rate else None)
         if message:
             log.info(message)
             notify.send(message)
+        return state['cups_since_refill']
     except Exception as e:
         log.warning(f"Hopper tracking failed: {e}")
+        return None
 
 
 def parse_schedule_line(line):
@@ -228,7 +240,9 @@ def resync_today():
         schedule.run_pending()
         schedule.clear()
         for entry in load_todays_schedule() or []:
-            schedule.every().day.at(entry['actual_time']).do(feed_pet, portion=entry['portion'])
+            schedule.every().day.at(entry['actual_time']).do(
+                feed_pet, portion=entry['portion'],
+                base_time=entry['base_time'], scheduled_for=entry['actual_time'])
 
 
 def ensure_today():

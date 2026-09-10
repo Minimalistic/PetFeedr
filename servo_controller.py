@@ -45,7 +45,7 @@ def trigger_servo(portion='small', source='scheduled'):
             line, which is the single source of truth for feeding stats
 
     Larger portions are dispensed as multiple cycles of the base unit
-    for more consistent results.
+    for more consistent results. Returns the elapsed seconds.
     """
     start_time = time.time()
     Motor1 = None
@@ -83,6 +83,7 @@ def trigger_servo(portion='small', source='scheduled'):
             log.info(f"[SIM] ✅ Feeding completed in {elapsed:.2f}s ({portion} portion, {source})")
         else:
             log.info(f"Feeding completed in {elapsed:.2f}s ({portion} portion, {source})")
+        return elapsed
 
     finally:
         # Errors propagate to feed_pet (which logs and alerts) — but the
