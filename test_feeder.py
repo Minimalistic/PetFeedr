@@ -529,3 +529,57 @@ class TestEventJournal(TempCwd):
             self.assertTrue(feeder_core.feed_pet())
         (ev,) = events.read_all()
         self.assertIsNone(ev['duration_s'])
+
+
+class TestRenderNote(TempCwd):
+    """ops/mini-sync/render_note.py: merging the journal with log archives."""
+
+    @classmethod
+    def setUpClass(cls):
+        import importlib.util
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ops', 'mini-sync', 'render_note.py')
+        spec = importlib.util.spec_from_file_location('render_note', path)
+        cls.rn = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.rn)
+
+    LOG = [
+        "2026-09-10 06:00:00,689 - INFO - Feeding completed in 0.31s (small portion, scheduled)\n",
+        "2026-09-10 14:00:01,100 - INFO - Feeding completed in 0.31s (small portion, scheduled)\n",
+        "2026-09-10 15:30:00,000 - INFO - Feeding failed (large portion, manual): jam\n",
+    ]
+    JOURNAL = [
+        {'ts': '2026-09-10T14:00:00', 'event': 'dispense', 'portion': 'small', 'cups': 0.25, 'source': 'scheduled'},
+        {'ts': '2026-09-10T16:00:00', 'event': 'dispense', 'portion': 'medium', 'cups': 0.5, 'source': 'manual'},
+        {'ts': '2026-09-10T16:00:05', 'event': 'dispense', 'portion': 'small', 'cups': 0.25, 'source': 'manual', 'sim': True},
+    ]
+
+    def test_overlap_day_is_deduplicated_not_double_counted(self):
+        merged = self.rn.merge_dispenses(self.JOURNAL[:2], self.LOG)
+        self.assertEqual([(d['ts'].strftime('%H:%M'), d['origin']) for d in merged],
+                         [('06:00', 'log'), ('14:00', 'journal'), ('16:00', 'journal')])
+
+    def test_sim_events_are_ignored(self):
+        with open('feeding_events.jsonl', 'w') as f:
+            for ev in self.JOURNAL:
+                f.write(json.dumps(ev) + '\n')
+        events = self.rn.load_events('feeding_events.jsonl')
+        self.assertEqual(len(events), 2)
+
+    def test_daily_totals_count_manual(self):
+        merged = self.rn.merge_dispenses(self.JOURNAL[:2], self.LOG)
+        day = self.rn.daily_totals(merged)[date(2026, 9, 10)]
+        self.assertEqual((day['cups'], day['feedings'], day['manual']), (1.0, 3, 1))
+
+    def test_render_includes_hopper_and_log_failure(self):
+        merged = self.rn.merge_dispenses(self.JOURNAL[:2], self.LOG)
+        hopper = {'cups_since_refill': 13.71, 'capacity_estimates': [39.17], 'last_refill': '2026-08-19'}
+        text = self.rn.render(merged, self.JOURNAL[:2], hopper,
+                              self.rn.failures_from_log(self.LOG), now=datetime(2026, 9, 10, 17))
+        self.assertIn('~65% full', text)
+        self.assertIn('feeding FAILED (large, manual)', text)
+        self.assertIn('| 2026-09-10 | 1 | 3 | 1 |', text)
+
+    def test_render_with_nothing_does_not_crash(self):
+        text = self.rn.render([], [], {}, now=datetime(2026, 9, 10, 17))
+        self.assertIn('learning capacity', text)
+        self.assertIn('No feedings recorded yet', text)
