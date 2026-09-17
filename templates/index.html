@@ -304,7 +304,7 @@
                             {% if hopper.days_left is not none %}
                                 <span class="hopper-days">~{{ hopper.days_left }} day{{ 's' if hopper.days_left != 1 }} of food left</span>
                             {% endif %}
-                            <span class="hopper-capacity">holds ~{{ hopper.capacity }} cups</span>
+                            <span class="hopper-capacity">holds ~{{ hopper.capacity }} cups{% if hopper.cups_per_lb %} (~{{ (hopper.capacity / hopper.cups_per_lb) | round(1) }} lb){% endif %}</span>
                         </div>
                     {% endif %}
                     <div class="hopper-refill">
@@ -316,6 +316,8 @@
                                     <option value="{{ val }}"{% if val == hopper.refill_default %} selected{% endif %}>{{ name }}</option>
                                 {% endfor %}
                             </select>
+                            <label for="lbs_added">Pounds added (optional)</label>
+                            <input type="number" id="lbs_added" name="lbs_added" min="0.1" max="50" step="0.1" inputmode="decimal" placeholder="e.g. 7">
                             <div class="refill-actions">
                                 <button type="submit" class="btn btn-primary">Log it</button>
                                 <button type="button" class="btn btn-secondary" id="refill-cancel">Cancel</button>

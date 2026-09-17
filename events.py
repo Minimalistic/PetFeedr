@@ -9,7 +9,8 @@ Event kinds and their fields:
   dispense    portion, cups, source, duration_s, base_time, scheduled_for,
               hopper_cups (counter after this dispense)
   failure     portion, source, error
-  refill      remaining_pct, cups_before, capacity_estimate, capacity
+  refill      remaining_pct, cups_before, capacity_estimate, capacity,
+              lbs_added, cups_per_lb_estimate (both null when not weighed)
   hopper_low  level, days_left
 
 Every event carries ts (local ISO time) and sim (True on a dev box without

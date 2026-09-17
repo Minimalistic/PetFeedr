@@ -9,7 +9,8 @@ from servo_controller import PORTION_SIZES, DEFAULT_PORTION
 from DRV8825 import SIMULATION_MODE
 import hopper
 
-APP_VERSION = "1.2.0"
+APP_VERSION = "1.3.0"
+MAX_REFILL_LBS = 50  # sanity bound — a typo like 700 would wreck the cups-per-lb median
 
 # Configurable port - default 5000, override with PETFEEDR_PORT env var
 WEB_PORT = int(os.environ.get('PETFEEDR_PORT', 5000))
@@ -477,10 +478,25 @@ def refill():
             return jsonify({'success': False, 'message': 'Percentage must be between 0 and 95'}), 400
         return "Percentage must be between 0 and 95", 400
 
+    # Weight is optional — blank means "didn't weigh it", not an error
+    lbs_raw = request.form.get('lbs_added', '').strip()
+    lbs_added = None
+    if lbs_raw:
+        try:
+            lbs_added = float(lbs_raw)
+        except ValueError:
+            lbs_added = -1  # falls through to the range check below
+        if not 0 < lbs_added <= MAX_REFILL_LBS:
+            message = f'Pounds added must be between 0 and {MAX_REFILL_LBS}'
+            if wants_json():
+                return jsonify({'success': False, 'message': message}), 400
+            return message, 400
+
     with STATE_LOCK:
-        state = hopper.record_refill(remaining_pct)
+        state = hopper.record_refill(remaining_pct, lbs_added)
     capacity = hopper.capacity_cups(state)
-    log.info(f"Hopper refilled (was ~{remaining_pct:.0f}% full)")
+    log.info(f"Hopper refilled (was ~{remaining_pct:.0f}% full"
+             + (f", {lbs_added:g} lb added)" if lbs_added else ")"))
 
     if capacity:
         message = f'Refill recorded — hopper holds ~{capacity} cups'

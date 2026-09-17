@@ -355,6 +355,26 @@ class TestHopper(TempCwd):
         self.assertEqual(info['level'], 1.0)
         self.assertEqual(info['days_left'], 13)
 
+    def test_weighed_refill_learns_cups_per_lb(self):
+        import hopper
+        for _ in range(4):
+            hopper.record_dispense(2.5)  # 10 cups total
+        state = hopper.record_refill(25, lbs_added=2.5)  # 10 cups / 2.5 lb
+        self.assertEqual(hopper.cups_per_lb(state), 4.0)
+        self.assertEqual(hopper.status()['cups_per_lb'], 4.0)
+
+    def test_unweighed_refill_leaves_cups_per_lb_unknown(self):
+        import hopper
+        hopper.record_dispense(10)
+        state = hopper.record_refill(25)
+        self.assertIsNone(hopper.cups_per_lb(state))
+
+    def test_weighed_refill_after_trivial_consumption_learns_nothing(self):
+        import hopper
+        hopper.record_dispense(0.5)
+        state = hopper.record_refill(10, lbs_added=7)
+        self.assertEqual(state['cups_per_lb_estimates'], [])
+
     def test_refill_without_dispenses_learns_nothing(self):
         import hopper
         state = hopper.record_refill(50)
@@ -425,6 +445,32 @@ class TestHopper(TempCwd):
                         headers={'Accept': 'application/json'})
         self.assertEqual(r.status_code, 200)
         self.assertTrue(r.get_json()['success'])
+
+    def test_refill_route_validates_lbs_added(self):
+        import hopper
+        import web_interface
+        client = web_interface.app.test_client()
+        hopper.record_dispense(10)
+        for bad in ('abc', '0', '-2', '700', 'nan', 'inf'):
+            r = client.post('/refill', data={'remaining_pct': '25', 'lbs_added': bad},
+                            headers={'Accept': 'application/json'})
+            self.assertEqual(r.status_code, 400, bad)
+        # A rejected weight must not have recorded the refill
+        self.assertEqual(hopper.load_state()['cups_since_refill'], 10)
+        r = client.post('/refill', data={'remaining_pct': '25', 'lbs_added': ' 2.5 '},
+                        headers={'Accept': 'application/json'})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(hopper.cups_per_lb(hopper.load_state()), 4.0)
+
+    def test_refill_route_treats_blank_lbs_as_unweighed(self):
+        import hopper
+        import web_interface
+        client = web_interface.app.test_client()
+        hopper.record_dispense(10)
+        r = client.post('/refill', data={'remaining_pct': '25', 'lbs_added': ''},
+                        headers={'Accept': 'application/json'})
+        self.assertEqual(r.status_code, 200)
+        self.assertIsNone(hopper.cups_per_lb(hopper.load_state()))
 
 
 if __name__ == '__main__':
