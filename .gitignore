@@ -43,3 +43,4 @@ SecretKeys.py
 backups/
 
 data/
+.playwright-mcp/

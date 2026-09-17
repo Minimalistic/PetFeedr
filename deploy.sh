@@ -70,6 +70,7 @@ rsync -avz --delete \
     --exclude '.github/' \
     --exclude 'data/' \
     --exclude 'CLAUDE.md' \
+    --exclude '.playwright-mcp/' \
     "$LOCAL_PATH/" "$PI_HOST:$PI_PATH/"
 
 # Check if venv exists, create if not
