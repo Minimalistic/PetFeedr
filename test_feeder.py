@@ -379,6 +379,10 @@ class TestHopper(TempCwd):
         hopper.record_refill(12.5, lbs_added=7)
         html = web_interface.app.test_client().get('/').get_data(as_text=True)
         self.assertIn('holds ~8 lb (128 oz), ~26.24 cups', html)
+        self.assertIn('~100% full (~8 lb left)', html)
+        hopper.record_dispense(13.12)  # half of 26.24 cups
+        html = web_interface.app.test_client().get('/').get_data(as_text=True)
+        self.assertIn('~50% full (~4 lb left)', html)
 
     def test_index_shows_cups_only_when_never_weighed(self):
         import hopper
@@ -388,6 +392,7 @@ class TestHopper(TempCwd):
         html = web_interface.app.test_client().get('/').get_data(as_text=True)
         self.assertIn('holds ~13.33 cups', html)
         self.assertNotIn(' oz)', html)
+        self.assertNotIn('lb left', html)
 
     def test_weighed_refill_after_trivial_consumption_learns_nothing(self):
         import hopper

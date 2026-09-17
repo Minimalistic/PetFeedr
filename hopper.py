@@ -137,11 +137,14 @@ def status(daily_avg_cups=None):
         'capacity_lbs': capacity_lbs(state),
         'learning': cap is None,
         'level': None,
+        'lbs_left': None,
         'days_left': None,
     }
     if cap:
         level = _level(state, cap)
         info['level'] = round(level, 2)
+        if info['capacity_lbs']:
+            info['lbs_left'] = round(info['capacity_lbs'] * level, 1)
         if daily_avg_cups:
             info['days_left'] = int(cap * level / daily_avg_cups)
     return info
