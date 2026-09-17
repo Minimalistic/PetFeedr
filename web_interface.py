@@ -9,7 +9,7 @@ from servo_controller import PORTION_SIZES, DEFAULT_PORTION
 from DRV8825 import SIMULATION_MODE
 import hopper
 
-APP_VERSION = "1.3.0"
+APP_VERSION = "1.3.1"
 MAX_REFILL_LBS = 50  # sanity bound — a typo like 700 would wreck the cups-per-lb median
 
 # Configurable port - default 5000, override with PETFEEDR_PORT env var

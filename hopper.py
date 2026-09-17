@@ -32,6 +32,7 @@ def _default_state():
         'cups_since_refill': 0.0,
         'capacity_estimates': [],
         'cups_per_lb_estimates': [],
+        'capacity_lbs_estimates': [],
         'low_notified': False,
     }
 
@@ -64,6 +65,12 @@ def cups_per_lb(state):
     return round(median(estimates), 2) if estimates else None
 
 
+def capacity_lbs(state):
+    """Median weight the hopper holds when full; None until a weighed refill."""
+    estimates = state['capacity_lbs_estimates']
+    return round(median(estimates), 1) if estimates else None
+
+
 def record_dispense(cups):
     state = load_state()
     state['cups_since_refill'] = round(state['cups_since_refill'] + cups, 2)
@@ -81,7 +88,9 @@ def record_refill(remaining_pct, lbs_added=None):
 
     Refills go to full, so the weight added equals the weight eaten since
     the last refill — cups_before / lbs_added is a cups-per-lb estimate
-    that doesn't depend on the eyeballed remaining_pct at all.
+    that doesn't depend on the eyeballed remaining_pct at all. Capacity in
+    lb comes straight from the weight too (lbs_added / fraction refilled)
+    rather than via cups, so a noisy cups estimate can't skew it.
     """
     state = load_state()
     consumed_fraction = 1 - remaining_pct / 100
@@ -92,17 +101,23 @@ def record_refill(remaining_pct, lbs_added=None):
         estimate = round(cups_before / consumed_fraction, 2)
         state['capacity_estimates'] = (
             state['capacity_estimates'] + [estimate])[-ESTIMATES_KEPT:]
+    lbs_estimate = None
     if lbs_added and cups_before >= MIN_LEARN_CUPS:
         per_lb_estimate = round(cups_before / lbs_added, 2)
         state['cups_per_lb_estimates'] = (
             state['cups_per_lb_estimates'] + [per_lb_estimate])[-ESTIMATES_KEPT:]
+        if consumed_fraction > 0:
+            lbs_estimate = round(lbs_added / consumed_fraction, 2)
+            state['capacity_lbs_estimates'] = (
+                state['capacity_lbs_estimates'] + [lbs_estimate])[-ESTIMATES_KEPT:]
     state['cups_since_refill'] = 0.0
     state['last_refill'] = date.today().isoformat()
     state['low_notified'] = False
     save_state(state)
     events.record('refill', remaining_pct=remaining_pct, cups_before=cups_before,
                   capacity_estimate=estimate, capacity=capacity_cups(state),
-                  lbs_added=lbs_added, cups_per_lb_estimate=per_lb_estimate)
+                  lbs_added=lbs_added, cups_per_lb_estimate=per_lb_estimate,
+                  capacity_lbs_estimate=lbs_estimate)
     return state
 
 
@@ -119,6 +134,7 @@ def status(daily_avg_cups=None):
         'last_refill': state['last_refill'],
         'capacity': cap,
         'cups_per_lb': cups_per_lb(state),
+        'capacity_lbs': capacity_lbs(state),
         'learning': cap is None,
         'level': None,
         'days_left': None,

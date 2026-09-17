@@ -304,7 +304,7 @@
                             {% if hopper.days_left is not none %}
                                 <span class="hopper-days">~{{ hopper.days_left }} day{{ 's' if hopper.days_left != 1 }} of food left</span>
                             {% endif %}
-                            <span class="hopper-capacity">holds ~{{ hopper.capacity }} cups{% if hopper.cups_per_lb %} (~{{ (hopper.capacity / hopper.cups_per_lb) | round(1) }} lb){% endif %}</span>
+                            <span class="hopper-capacity">holds {% if hopper.capacity_lbs %}~{{ '%g' % hopper.capacity_lbs }} lb ({{ (hopper.capacity_lbs * 16) | round | int }} oz), {% endif %}~{{ hopper.capacity }} cups</span>
                         </div>
                     {% endif %}
                     <div class="hopper-refill">

@@ -362,12 +362,32 @@ class TestHopper(TempCwd):
         state = hopper.record_refill(25, lbs_added=2.5)  # 10 cups / 2.5 lb
         self.assertEqual(hopper.cups_per_lb(state), 4.0)
         self.assertEqual(hopper.status()['cups_per_lb'], 4.0)
+        # 2.5 lb refilled 75% of the hopper → holds ~3.3 lb
+        self.assertEqual(hopper.status()['capacity_lbs'], 3.3)
 
     def test_unweighed_refill_leaves_cups_per_lb_unknown(self):
         import hopper
         hopper.record_dispense(10)
         state = hopper.record_refill(25)
         self.assertIsNone(hopper.cups_per_lb(state))
+        self.assertIsNone(hopper.capacity_lbs(state))
+
+    def test_index_shows_capacity_in_lb_and_oz_once_weighed(self):
+        import hopper
+        import web_interface
+        hopper.record_dispense(22.96)
+        hopper.record_refill(12.5, lbs_added=7)
+        html = web_interface.app.test_client().get('/').get_data(as_text=True)
+        self.assertIn('holds ~8 lb (128 oz), ~26.24 cups', html)
+
+    def test_index_shows_cups_only_when_never_weighed(self):
+        import hopper
+        import web_interface
+        hopper.record_dispense(10)
+        hopper.record_refill(25)
+        html = web_interface.app.test_client().get('/').get_data(as_text=True)
+        self.assertIn('holds ~13.33 cups', html)
+        self.assertNotIn(' oz)', html)
 
     def test_weighed_refill_after_trivial_consumption_learns_nothing(self):
         import hopper
