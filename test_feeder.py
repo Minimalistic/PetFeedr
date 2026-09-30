@@ -829,3 +829,89 @@ class TestManualFeedGuards(TempCwd):
         resp = self.client.post('/add', data={'feeding_time': '23:59'}, headers=self.json)
         self.assertEqual(resp.status_code, 200)
 
+
+class TestWatchdog(TempCwd):
+    """ops/mini-sync/watchdog.py: outside-in alerts from the synced store."""
+
+    @classmethod
+    def setUpClass(cls):
+        import importlib.util
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ops', 'mini-sync', 'watchdog.py')
+        spec = importlib.util.spec_from_file_location('watchdog', path)
+        cls.wd = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.wd)
+
+    NOW = datetime(2026, 9, 29, 14, 30)
+
+    def _store(self, schedule_date='2026-09-29', times=('06:00', '14:00'), events=()):
+        with open('todays_schedule.json', 'w') as f:
+            json.dump({'date': schedule_date, 'schedule': [
+                {'base_time': t, 'actual_time': t, 'portion': 'small'} for t in times]}, f)
+        with open('feeding_events.jsonl', 'w') as f:
+            for e in events:
+                f.write(json.dumps(e) + '\n')
+
+    @staticmethod
+    def _dispense(time_str, **extra):
+        return {'ts': f'2026-09-29T{time_str}:01', 'event': 'dispense', 'scheduled_for': time_str, **extra}
+
+    def _keys(self, now=None, contact_ago=5):
+        alerts, _ = self.wd.check('.', now or self.NOW, (now or self.NOW) - timedelta(minutes=contact_ago))
+        return [k for k, _, _ in alerts]
+
+    def test_all_fed_is_quiet(self):
+        self._store(events=[self._dispense('06:00'), self._dispense('14:00')])
+        self.assertEqual(self._keys(), [])
+
+    def test_missed_feed_after_grace_alerts(self):
+        self._store(events=[self._dispense('06:00')])
+        self.assertEqual(self._keys(), ['missed:2026-09-29:14:00'])
+
+    def test_missed_feed_within_grace_is_quiet(self):
+        self._store(events=[self._dispense('06:00')])
+        self.assertEqual(self._keys(now=datetime(2026, 9, 29, 14, 10)), [])
+
+    def test_failure_event_is_not_double_paged(self):
+        self._store(events=[self._dispense('06:00'),
+                            {'ts': '2026-09-29T14:00:01', 'event': 'failure', 'scheduled_for': '14:00'}])
+        self.assertEqual(self._keys(), [])
+
+    def test_unrolled_schedule_alerts_after_grace(self):
+        self._store(schedule_date='2026-09-28')
+        self.assertEqual(self._keys(), ['stale:2026-09-29'])
+        self.assertEqual(self._keys(now=datetime(2026, 9, 29, 0, 5)), [])
+
+    def test_sim_events_from_pi_alert(self):
+        self._store(events=[self._dispense('06:00', sim=True), self._dispense('14:00', sim=True)])
+        self.assertEqual(self._keys(), ['sim:2026-09-29'])
+
+    def test_no_contact_is_unreachable(self):
+        alerts, reachable = self.wd.check('.', self.NOW, None)
+        self.assertFalse(reachable)
+        self.assertEqual([k for k, _, _ in alerts], ['unreachable'])
+
+    def test_stale_data_skips_schedule_checks(self):
+        self._store(events=[])  # everything "missed", but data is 30 min old
+        self.assertEqual(self._keys(contact_ago=30), [])
+
+    def test_alerts_once_then_recovery_notice(self):
+        with open('last_contact', 'w') as f:
+            f.write(str(int((datetime.now() - timedelta(hours=2)).timestamp())))
+        with patch.object(self.wd, 'send', return_value=True) as mock_send, \
+             patch.object(self.wd.sys, 'argv', ['watchdog.py', '.']):
+            self.wd.main()
+            self.wd.main()
+            self.assertEqual(mock_send.call_count, 1)
+            with open('last_contact', 'w') as f:
+                f.write(str(int(datetime.now().timestamp())))
+            self._store(schedule_date=date.today().isoformat(), times=())
+            self.wd.main()
+            self.assertEqual(mock_send.call_args[0][0], "Feeder is back online.")
+
+    def test_unsent_alert_is_retried(self):
+        with patch.object(self.wd, 'send', return_value=False) as mock_send, \
+             patch.object(self.wd.sys, 'argv', ['watchdog.py', '.']):
+            self.wd.main()
+            self.wd.main()
+        self.assertEqual(mock_send.call_count, 2)
+

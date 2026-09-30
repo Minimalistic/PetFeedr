@@ -85,7 +85,8 @@ def feed_pet(portion=DEFAULT_PORTION, source='scheduled', base_time=None, schedu
             log.exception(f"Feeding failed ({portion} portion, {source}): {e}")
             notify.send(f"Feeding FAILED ({portion} portion, {source}): {e} — "
                         "the motor may be jammed.", priority=1)
-            events.record('failure', portion=portion, source=source, error=str(e))
+            events.record('failure', portion=portion, source=source, error=str(e),
+                          base_time=base_time, scheduled_for=scheduled_for)
             return False
         cups = PORTION_CUPS.get(portion, 0.25)
         hopper_cups = _track_hopper(cups)
