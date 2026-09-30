@@ -754,3 +754,78 @@ class TestLearnedCupsPerLb(unittest.TestCase):
         self.assertEqual(feeding_stats.calculate_consumption_rate(
             week, cups_per_lb=5.0)['daily_lbs'], 0.4)
 
+
+class TestManualFeedGuards(TempCwd):
+    def setUp(self):
+        super().setUp()
+        import web_interface
+        self.wi = web_interface
+        web_interface._last_manual_feed = None
+        self.client = web_interface.app.test_client()
+        self.json = {'Accept': 'application/json'}
+        with open('feeding_schedules.txt', 'w') as f:
+            f.write("08:00,medium\n17:00,medium\n20:00,small\n")  # 1.25 cups → allowance 0.75 (floor)
+
+    def _log_manual(self, portion, n):
+        stamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with open('feeding_log.txt', 'a') as f:
+            for _ in range(n):
+                f.write(f"{stamp},100 - INFO - Feeding completed in 0.31s ({portion} portion, manual)\n")
+
+    def test_allowance_is_half_schedule_with_floor(self):
+        self.assertEqual(self.wi.manual_allowance_cups(), 0.75)
+        with open('feeding_schedules.txt', 'w') as f:
+            f.write("06:00,large\n12:00,large\n18:00,large\n")  # 2.25 cups
+        self.assertEqual(self.wi.manual_allowance_cups(), 1.125)
+
+    def test_feed_within_allowance_dispenses(self):
+        with patch('web_interface.feed_pet', return_value=True) as mock_feed:
+            resp = self.client.post('/feed', data={'portion': 'small'}, headers=self.json)
+        self.assertEqual(resp.status_code, 200)
+        mock_feed.assert_called_once()
+
+    def test_feed_over_allowance_refused_without_dispensing(self):
+        self._log_manual('medium', 1)  # 0.5 used; a medium would make 1.0 > 0.75
+        with patch('web_interface.feed_pet') as mock_feed:
+            resp = self.client.post('/feed', data={'portion': 'medium'}, headers=self.json)
+        self.assertEqual(resp.status_code, 429)
+        self.assertIn('0.5 of 0.75', resp.get_json()['message'])
+        mock_feed.assert_not_called()
+
+    def test_scheduled_feeds_do_not_count_toward_manual_cap(self):
+        stamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with open('feeding_log.txt', 'w') as f:
+            f.write(f"{stamp},1 - INFO - Feeding completed in 0.3s (large portion, scheduled)\n" * 3)
+        with patch('web_interface.feed_pet', return_value=True):
+            resp = self.client.post('/feed', data={'portion': 'small'}, headers=self.json)
+        self.assertEqual(resp.status_code, 200)
+
+    def test_second_feed_within_cooldown_refused(self):
+        with patch('web_interface.feed_pet', return_value=True) as mock_feed:
+            self.client.post('/feed', data={'portion': 'small'}, headers=self.json)
+            resp = self.client.post('/feed', data={'portion': 'small'}, headers=self.json)
+        self.assertEqual(resp.status_code, 429)
+        self.assertEqual(mock_feed.call_count, 1)
+
+    def test_failed_feed_does_not_start_cooldown(self):
+        with patch('web_interface.feed_pet', side_effect=[False, True]) as mock_feed:
+            self.client.post('/feed', data={'portion': 'small'}, headers=self.json)
+            resp = self.client.post('/feed', data={'portion': 'small'}, headers=self.json)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(mock_feed.call_count, 2)
+
+    def test_cross_origin_post_refused(self):
+        with patch('web_interface.feed_pet') as mock_feed:
+            resp = self.client.post('/feed', data={'portion': 'small'},
+                                    headers={**self.json, 'Origin': 'https://evil.example'})
+        self.assertEqual(resp.status_code, 403)
+        mock_feed.assert_not_called()
+
+    def test_same_origin_and_originless_posts_allowed(self):
+        with patch('web_interface.feed_pet', return_value=True):
+            resp = self.client.post('/feed', data={'portion': 'small'},
+                                    headers={**self.json, 'Origin': 'http://localhost'})
+        self.assertEqual(resp.status_code, 200)
+        resp = self.client.post('/add', data={'feeding_time': '23:59'}, headers=self.json)
+        self.assertEqual(resp.status_code, 200)
+
