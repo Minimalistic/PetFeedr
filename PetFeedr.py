@@ -9,7 +9,7 @@ from datetime import date
 from threading import Thread
 
 from feeder_core import (STATE_LOCK, ensure_today, generate_todays_schedule,
-                         resync_today, log, setup_logging)
+                         resync_today, catch_up_missed, log, setup_logging)
 from DRV8825 import SIMULATION_MODE
 import web_interface
 
@@ -23,6 +23,12 @@ def run():
         log.info("Finished loading feeding times.")
     except Exception as e:
         log.error(f"Error loading feeding schedule: {str(e)}")
+
+    # Separate try: a catch-up problem must never stop the scheduler starting
+    try:
+        catch_up_missed()
+    except Exception:
+        log.exception("Startup catch-up failed")
 
     log.info("Starting schedule execution.")
     last_date = date.today()

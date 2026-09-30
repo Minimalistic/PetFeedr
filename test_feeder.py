@@ -931,3 +931,104 @@ class TestGpioLoading(unittest.TestCase):
         import DRV8825
         _, sim = DRV8825.load_gpio(force_simulate=True, is_pi=True)
         self.assertTrue(sim)
+
+
+class TestCatchUp(TempCwd):
+    """Startup catch-up of feedings that came due while the process was down."""
+    NOW = datetime.combine(date.today(), datetime.strptime("14:20", "%H:%M").time())
+
+    def setUp(self):
+        super().setUp()
+        feeder_core.save_todays_schedule([
+            {'base_time': t, 'actual_time': t, 'portion': 'small', 'is_fixed': True, 'randomized': False}
+            for t in ('06:00', '14:00', '18:00')])
+
+    def _journal(self, *entries):
+        with open('feeding_events.jsonl', 'w') as f:
+            for e in entries:
+                f.write(json.dumps({'ts': f"{date.today().isoformat()}T{e[1]}:01", 'event': e[0],
+                                    'scheduled_for': e[1]}) + '\n')
+
+    def _run(self):
+        with patch('feeder_core.feed_pet', return_value=True) as mock_feed, \
+             patch('feeder_core.notify.send') as mock_send:
+            result = feeder_core.catch_up_missed(now=self.NOW)
+        return result, mock_feed, mock_send
+
+    def test_recent_miss_is_caught_up_once(self):
+        self._journal(('dispense', '06:00'))
+        result, mock_feed, mock_send = self._run()
+        self.assertEqual(result, ['14:00'])
+        self.assertEqual(mock_feed.call_args.kwargs,
+                         {'portion': 'small', 'base_time': '14:00', 'scheduled_for': '14:00',
+                          'late_by_min': 20})
+        self.assertEqual(mock_send.call_args.kwargs, {'priority': -1})
+
+    def test_already_dispensed_is_not_refed(self):
+        self._journal(('dispense', '06:00'), ('dispense', '14:00'))
+        result, mock_feed, _ = self._run()
+        self.assertEqual(result, [])
+        mock_feed.assert_not_called()
+
+    def test_log_line_counts_when_journal_write_failed(self):
+        # The journal is fail-soft; a lost event must not become a second meal
+        self._journal(('dispense', '06:00'))
+        with open('feeding_log.txt', 'w') as f:
+            f.write(f"{date.today().isoformat()} 14:00:01,277 - INFO - "
+                    "Feeding completed in 0.31s (small portion, scheduled)\n")
+        result, mock_feed, _ = self._run()
+        self.assertEqual(result, [])
+
+    def test_manual_feed_near_slot_does_not_count(self):
+        self._journal(('dispense', '06:00'))
+        with open('feeding_log.txt', 'w') as f:
+            f.write(f"{date.today().isoformat()} 14:00:30,1 - INFO - "
+                    "Feeding completed in 0.31s (small portion, manual)\n")
+        result, _, _ = self._run()
+        self.assertEqual(result, ['14:00'])
+
+    def test_failure_is_not_retried(self):
+        self._journal(('dispense', '06:00'), ('failure', '14:00'))
+        result, mock_feed, _ = self._run()
+        mock_feed.assert_not_called()
+
+    def test_old_miss_is_left_to_watchdog(self):
+        # 06:00 is 8h late and unfed: too late to dispense automatically
+        self._journal(('dispense', '14:00'))
+        result, mock_feed, _ = self._run()
+        self.assertEqual(result, [])
+        mock_feed.assert_not_called()
+
+    def test_failed_catch_up_does_not_notify_success(self):
+        self._journal(('dispense', '06:00'))
+        with patch('feeder_core.feed_pet', return_value=False), \
+             patch('feeder_core.notify.send') as mock_send:
+            self.assertEqual(feeder_core.catch_up_missed(now=self.NOW), [])
+        mock_send.assert_not_called()
+
+    def test_real_dispense_records_lateness_in_journal(self):
+        self._journal(('dispense', '06:00'))
+        with patch('feeder_core.trigger_servo', return_value=0.3), \
+             patch('feeder_core.notify.send'):
+            feeder_core.catch_up_missed(now=self.NOW)
+        with open('feeding_events.jsonl') as f:
+            last = json.loads(f.readlines()[-1])
+        self.assertEqual((last['scheduled_for'], last['late_by_min']), ('14:00', 20))
+
+    def test_second_restart_does_not_refeed_a_caught_up_slot(self):
+        # Journal lost, but the log shows the catch-up already ran (its
+        # "completed" line is late, outside the normal match window)
+        self._journal(('dispense', '06:00'))
+        with open('feeding_log.txt', 'w') as f:
+            f.write(f"{date.today().isoformat()} 14:19:58,1 - INFO - Catching up missed 14:00 feeding (19 min late)\n"
+                    f"{date.today().isoformat()} 14:19:59,1 - INFO - Feeding completed in 0.31s (small portion, scheduled)\n")
+        result, mock_feed, _ = self._run()
+        mock_feed.assert_not_called()
+
+    def test_sim_journal_events_still_count(self):
+        with open('feeding_events.jsonl', 'w') as f:
+            for t in ('06:00', '14:00'):
+                f.write(json.dumps({'ts': f"{date.today().isoformat()}T14:19:00", 'event': 'dispense',
+                                    'scheduled_for': t, 'sim': True}) + '\n')
+        result, mock_feed, _ = self._run()
+        mock_feed.assert_not_called()
