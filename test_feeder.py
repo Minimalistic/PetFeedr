@@ -915,3 +915,19 @@ class TestWatchdog(TempCwd):
             self.wd.main()
         self.assertEqual(mock_send.call_count, 2)
 
+
+class TestGpioLoading(unittest.TestCase):
+    def test_off_pi_missing_gpio_simulates(self):
+        import DRV8825
+        _, sim = DRV8825.load_gpio(force_simulate=False, is_pi=False)
+        self.assertTrue(sim)  # RPi.GPIO isn't installed on the dev box
+
+    def test_on_pi_missing_gpio_refuses_to_simulate(self):
+        import DRV8825
+        with self.assertRaises(ImportError):
+            DRV8825.load_gpio(force_simulate=False, is_pi=True)
+
+    def test_forced_simulation_wins_on_pi(self):
+        import DRV8825
+        _, sim = DRV8825.load_gpio(force_simulate=True, is_pi=True)
+        self.assertTrue(sim)
