@@ -162,6 +162,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initBarChart();
     initRateToggle();
     initAjaxForms();
+    initHoldToFeed();
 
     // Register service worker for PWA
     if ('serviceWorker' in navigator) {
@@ -266,7 +267,8 @@ function confirmAction(button, onConfirm) {
 }
 
 // ===== AJAX Form Submission =====
-async function submitForm(form) {
+// Resolves true on success so callers can celebrate only real successes
+async function submitForm(form, { reloadDelay = 500 } = {}) {
     const url = form.action;
     const formData = new FormData(form);
     try {
@@ -278,12 +280,117 @@ async function submitForm(form) {
         const data = await response.json();
         if (data.success) {
             showToast(data.message, 'success');
-            setTimeout(() => window.location.reload(), 500);
-        } else {
-            showToast(data.message || 'Something went wrong', 'error');
+            setTimeout(() => window.location.reload(), reloadDelay);
+            return true;
         }
+        showToast(data.message || 'Something went wrong', 'error');
     } catch (err) {
         showToast('Network error — please try again', 'error');
+    }
+    return false;
+}
+
+// ===== Hold to Feed =====
+// Press-and-hold instead of tap-to-confirm: one deliberate gesture, and an
+// accidental brush can't dispense. The ring fills in CSS over HOLD_MS.
+const HOLD_MS = 700;
+let feedHoldActive = false;
+
+function initHoldToFeed() {
+    const form = document.querySelector('.feed-form');
+    const btn = form?.querySelector('.feed-circle-btn');
+    const wrap = form?.querySelector('.feed-hold');
+    const hint = form?.querySelector('.hold-hint');
+    if (!btn || !wrap) return;
+
+    let timer = null;
+    let pressedAt = 0;
+    let busy = false;
+
+    // Only a completed hold feeds — Enter or a no-JS submit is ignored here
+    form.addEventListener('submit', e => e.preventDefault());
+    // Long-press on mobile would otherwise open the context menu mid-hold
+    btn.addEventListener('contextmenu', e => e.preventDefault());
+
+    function start(e) {
+        if (btn.disabled || busy || timer) return;
+        e.preventDefault();
+        pressedAt = Date.now();
+        feedHoldActive = true;
+        wrap.classList.add('holding');
+        timer = setTimeout(fire, HOLD_MS);
+    }
+
+    function cancel() {
+        if (!timer) return;
+        clearTimeout(timer);
+        timer = null;
+        feedHoldActive = false;
+        wrap.classList.remove('holding');
+        // A quick tap gets a nudge instead of silently doing nothing
+        if (Date.now() - pressedAt < HOLD_MS && hint) {
+            hint.classList.remove('nudge');
+            void hint.offsetWidth;  // restart the animation
+            hint.classList.add('nudge');
+        }
+    }
+
+    async function fire() {
+        timer = null;
+        busy = true;
+        wrap.classList.remove('holding');
+        wrap.classList.add('fired');
+        navigator.vibrate?.(30);
+        const ok = await submitForm(form, { reloadDelay: 1400 });
+        feedHoldActive = false;
+        if (ok) {
+            // Ring stays full and green until the reload — a completed gesture
+            btn.classList.add('fed');
+            dropKibble(btn);
+        } else {
+            wrap.classList.remove('fired');
+            busy = false;
+        }
+    }
+
+    btn.addEventListener('pointerdown', start);
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => btn.addEventListener(ev, cancel));
+    btn.addEventListener('keydown', e => {
+        if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) start(e);
+    });
+    btn.addEventListener('keyup', e => {
+        if (e.key === ' ' || e.key === 'Enter') cancel();
+    });
+}
+
+// ===== Kibble Drop =====
+// A handful of kibble tumbles out under the button after a real dispense
+function dropKibble(btn) {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const card = btn.closest('.feed-card');
+    if (!card) return;
+    let layer = card.querySelector('.kibble-layer');
+    if (!layer) {
+        layer = document.createElement('div');
+        layer.className = 'kibble-layer';
+        card.appendChild(layer);
+    }
+    const cardBox = card.getBoundingClientRect();
+    const btnBox = btn.getBoundingClientRect();
+    const originX = btnBox.left - cardBox.left + btnBox.width / 2;
+    const originY = btnBox.bottom - cardBox.top - 12;
+
+    for (let i = 0; i < 10; i++) {
+        const k = document.createElement('span');
+        k.className = 'kibble';
+        k.style.left = `${originX + (Math.random() - 0.5) * 30}px`;
+        k.style.top = `${originY}px`;
+        k.style.setProperty('--dx', `${(Math.random() - 0.5) * 90}px`);
+        k.style.setProperty('--rot', `${(Math.random() - 0.5) * 540}deg`);
+        k.style.setProperty('--delay', `${i * 45}ms`);
+        k.style.setProperty('--size', `${7 + Math.random() * 4}px`);
+        k.addEventListener('animationend', () => k.remove());
+        layer.appendChild(k);
     }
 }
 
@@ -292,25 +399,6 @@ function initAjaxForms() {
     document.querySelector('.add-form')?.addEventListener('submit', function(e) {
         e.preventDefault();
         submitForm(this);
-    });
-
-    // Feed now — with inline confirm on circle button
-    const feedForm = document.querySelector('.feed-form');
-    feedForm?.addEventListener('submit', function(e) {
-        e.preventDefault();
-        const btn = this.querySelector('.feed-circle-btn');
-        if (!btn) return;
-        confirmAction(btn, () => {
-            submitForm(this).then(() => {
-                // Ripple + pulse effect
-                const ripple = document.createElement('span');
-                ripple.className = 'ripple';
-                btn.appendChild(ripple);
-                btn.classList.add('fed');
-                ripple.addEventListener('animationend', () => ripple.remove());
-                setTimeout(() => btn.classList.remove('fed'), 1000);
-            });
-        });
     });
 
     // Portion segmented control description
@@ -424,6 +512,7 @@ function initCountdown() {
 setInterval(() => {
     const tag = document.activeElement?.tagName;
     if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+    if (feedHoldActive) return;  // never yank the page out from under a hold
     window.location.reload();
 }, 60000);
 

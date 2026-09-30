@@ -379,11 +379,11 @@ class TestHopper(TempCwd):
         hopper.record_dispense(22.96)
         hopper.record_refill(12.5, lbs_added=7)
         html = web_interface.app.test_client().get('/').get_data(as_text=True)
-        self.assertIn('holds ~8 lb (128 oz), ~26.24 cups', html)
-        self.assertIn('~100% full (~8 lb left)', html)
+        self.assertIn('Holds ~8 lb (128 oz), ~26.24 cups', html)
+        self.assertIn('~100% full <span class="hopper-lbs">· ~8 lb</span>', html)
         hopper.record_dispense(13.12)  # half of 26.24 cups
         html = web_interface.app.test_client().get('/').get_data(as_text=True)
-        self.assertIn('~50% full (~4 lb left)', html)
+        self.assertIn('~50% full <span class="hopper-lbs">· ~4 lb</span>', html)
 
     def test_index_shows_cups_only_when_never_weighed(self):
         import hopper
@@ -391,9 +391,9 @@ class TestHopper(TempCwd):
         hopper.record_dispense(10)
         hopper.record_refill(25)
         html = web_interface.app.test_client().get('/').get_data(as_text=True)
-        self.assertIn('holds ~13.33 cups', html)
+        self.assertIn('Holds ~13.33 cups', html)
         self.assertNotIn(' oz)', html)
-        self.assertNotIn('lb left', html)
+        self.assertNotIn('hopper-lbs', html)
 
     def test_weighed_refill_after_trivial_consumption_learns_nothing(self):
         import hopper
@@ -773,10 +773,11 @@ class TestManualFeedGuards(TempCwd):
                 f.write(f"{stamp},100 - INFO - Feeding completed in 0.31s ({portion} portion, manual)\n")
 
     def test_allowance_is_half_schedule_with_floor(self):
-        self.assertEqual(self.wi.manual_allowance_cups(), 0.75)
+        import manual_limit
+        self.assertEqual(manual_limit.allowance_cups(), 0.75)
         with open('feeding_schedules.txt', 'w') as f:
             f.write("06:00,large\n12:00,large\n18:00,large\n")  # 2.25 cups
-        self.assertEqual(self.wi.manual_allowance_cups(), 1.125)
+        self.assertEqual(manual_limit.allowance_cups(), 1.125)
 
     def test_feed_within_allowance_dispenses(self):
         with patch('web_interface.feed_pet', return_value=True) as mock_feed:
@@ -1032,3 +1033,125 @@ class TestCatchUp(TempCwd):
                                     'scheduled_for': t, 'sim': True}) + '\n')
         result, mock_feed, _ = self._run()
         mock_feed.assert_not_called()
+
+
+class TestSlotOutcome(unittest.TestCase):
+    TODAY = date(2026, 9, 29)
+
+    def _ev(self, kind, slot, **kw):
+        return {'ts': f'2026-09-29T{slot}:01', 'event': kind, 'scheduled_for': slot, **kw}
+
+    def test_journal_outcomes(self):
+        so = feeder_core.slot_outcome
+        self.assertEqual(so('06:00', self.TODAY, [self._ev('dispense', '06:00')], []), ('fed', None))
+        self.assertEqual(so('06:00', self.TODAY, [self._ev('dispense', '06:00', late_by_min=12)], []),
+                         ('late', 12))
+        self.assertEqual(so('06:00', self.TODAY, [self._ev('failure', '06:00')], []), ('failed', None))
+        self.assertEqual(so('06:00', self.TODAY, [self._ev('missed', '06:00', late_by_min=90)], []),
+                         ('missed', 90))
+        self.assertEqual(so('06:00', self.TODAY, [], []), (None, None))
+
+    def test_dispense_wins_over_failure(self):
+        evs = [self._ev('failure', '06:00'), self._ev('dispense', '06:00')]
+        self.assertEqual(feeder_core.slot_outcome('06:00', self.TODAY, evs, [])[0], 'fed')
+
+    def test_log_fallbacks(self):
+        catch = ["2026-09-29 06:20:00,1 - INFO - Catching up missed 06:00 feeding (20 min late)\n"]
+        self.assertEqual(feeder_core.slot_outcome('06:00', self.TODAY, [], catch), ('late', 20))
+        done = ["2026-09-29 06:00:02,1 - INFO - Feeding completed in 0.3s (small portion, scheduled)\n"]
+        self.assertEqual(feeder_core.slot_outcome('06:00', self.TODAY, [], done), ('fed', None))
+
+
+class TestCatchUpRecordsMisses(TempCwd):
+    def test_too_late_slot_is_journaled_as_missed_once(self):
+        feeder_core.save_todays_schedule([{'base_time': '06:00', 'actual_time': '06:00',
+                                           'portion': 'small', 'is_fixed': True, 'randomized': False}])
+        noon = datetime.combine(date.today(), datetime.strptime("12:00", "%H:%M").time())
+        with patch('feeder_core.feed_pet') as mock_feed:
+            feeder_core.catch_up_missed(now=noon)
+            feeder_core.catch_up_missed(now=noon)  # second restart: already recorded
+        mock_feed.assert_not_called()
+        import events
+        missed = [e for e in events.read_all() if e['event'] == 'missed']
+        self.assertEqual(len(missed), 1)
+        self.assertEqual((missed[0]['scheduled_for'], missed[0]['late_by_min']), ('06:00', 360))
+
+
+class TestOnTimeSummary(unittest.TestCase):
+    TODAY = date(2026, 9, 29)
+
+    @staticmethod
+    def _ev(day, kind='dispense', **kw):
+        return {'ts': f'2026-09-{day:02d}T06:00:01', 'event': kind, 'scheduled_for': '06:00', **kw}
+
+    def test_streak_counts_back_from_today(self):
+        evs = [self._ev(d) for d in (26, 27, 28, 29)]
+        s = feeding_stats.on_time_summary(evs, self.TODAY)
+        self.assertEqual((s['streak_days'], s['week_on_time'], s['week_total']), (4, 4, 4))
+
+    def test_empty_today_neither_extends_nor_breaks(self):
+        s = feeding_stats.on_time_summary([self._ev(d) for d in (27, 28)], self.TODAY)
+        self.assertEqual(s['streak_days'], 2)
+
+    def test_late_missed_or_failed_breaks_streak(self):
+        for bad in (self._ev(28, late_by_min=10), self._ev(28, 'missed'), self._ev(28, 'failure')):
+            evs = [self._ev(27), self._ev(28), bad, self._ev(29)]
+            s = feeding_stats.on_time_summary(evs, self.TODAY)
+            self.assertEqual(s['streak_days'], 1, bad)
+            self.assertEqual((s['week_on_time'], s['week_total']), (3, 4))
+
+    def test_manual_feeds_are_ignored(self):
+        manual = {'ts': '2026-09-29T12:00:00', 'event': 'dispense', 'source': 'manual', 'scheduled_for': None}
+        s = feeding_stats.on_time_summary([manual], self.TODAY)
+        self.assertEqual((s['streak_days'], s['week_total']), (0, 0))
+
+
+class TestDashboardExtras(TempCwd):
+    def test_manual_status_marks_portions_that_no_longer_fit(self):
+        import manual_limit
+        with open('feeding_schedules.txt', 'w') as f:
+            f.write("08:00,small\n")  # allowance hits the 0.75 floor
+        stamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with open('feeding_log.txt', 'w') as f:
+            f.write(f"{stamp},1 - INFO - Feeding completed in 0.3s (small portion, manual)\n")
+        st = manual_limit.status()
+        self.assertEqual((st['used'], st['remaining']), (0.25, 0.5))
+        self.assertEqual(st['fits'], {'small': True, 'medium': True, 'large': False})
+
+    def test_cups_filter(self):
+        import web_interface
+        f = web_interface._cups_filter
+        self.assertEqual([f(0), f(0.25), f(0.5), f(1), f(1.25), f(2)],
+                         ['0 cups', '¼ cup', '½ cup', '1 cup', '1¼ cups', '2 cups'])
+
+    def test_refill_by_date_leaves_low_alert_margin(self):
+        import dashboard
+        import hopper
+        with patch('dashboard.hopper.status', return_value={
+                'last_refill': '2026-09-17', 'level': 0.5, 'days_left': 10}):
+            card = dashboard.hopper_card({'daily_cups': 1.25})
+        refill_by = date.today() + timedelta(days=10 - hopper.LOW_DAYS)
+        self.assertIn(f"{refill_by:%b} {refill_by.day}", card['refill_by_label'])
+
+    def test_refill_by_today_when_nearly_empty(self):
+        import dashboard
+        with patch('dashboard.hopper.status', return_value={
+                'last_refill': '2026-09-17', 'level': 0.05, 'days_left': 1}):
+            self.assertEqual(dashboard.hopper_card({'daily_cups': 1.25})['refill_by_label'], 'today')
+
+    def test_index_renders_every_slot_status(self):
+        import web_interface
+        slots = ['00:01', '00:02', '00:03', '00:04', '23:59']
+        with open('feeding_schedules.txt', 'w') as f:
+            f.writelines(f"{s},small,fixed\n" for s in slots)
+        feeder_core.save_todays_schedule([{'base_time': s, 'actual_time': s, 'portion': 'small',
+                                           'is_fixed': True, 'randomized': False} for s in slots])
+        t = date.today().isoformat()
+        with open('feeding_events.jsonl', 'w') as f:
+            for kind, slot, extra in (('dispense', '00:01', {}), ('dispense', '00:02', {'late_by_min': 7}),
+                                      ('failure', '00:03', {})):
+                f.write(json.dumps({'ts': f'{t}T{slot}:01', 'event': kind, 'scheduled_for': slot, **extra}) + '\n')
+        html = web_interface.app.test_client().get('/').get_data(as_text=True)
+        for status in ('status-fed', 'status-late', 'status-failed', 'status-missed', 'status-upcoming'):
+            self.assertIn(status, html)
+        self.assertIn('+7m', html)

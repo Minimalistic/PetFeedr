@@ -4,14 +4,20 @@ Split out of web_interface so the routes file holds routes. Read-only —
 nothing here mutates state.
 """
 
-from datetime import datetime
+from datetime import date, datetime, timedelta
 
-from feeder_core import load_todays_schedule, log
+from feeder_core import load_todays_schedule, log, slot_outcome, todays_records
 from feeding_stats import (parse_recent_activity, parse_weekly_stats, build_week_summary,
-                           calculate_consumption_rate, calculate_daily_total)
+                           calculate_consumption_rate, calculate_daily_total, on_time_summary)
 from servo_controller import PORTION_SIZES
+import events
 import hopper
+import manual_limit
 import schedule_store
+
+# A slot this recently due with nothing recorded is "due", not "missed" —
+# the dispense lands within seconds, the page just rendered first
+DUE_GRACE_MIN = 2
 
 
 def read_schedules_with_details():
@@ -77,6 +83,27 @@ def mark_past_feedings(schedules):
     return schedules
 
 
+def attach_outcomes(schedules, now=None):
+    """Tag each slot with what actually happened: status is 'fed', 'late',
+    'failed', 'missed', 'due', or 'upcoming'; late_min for caught-up feeds."""
+    now = now or datetime.now()
+    today = now.date()
+    todays_events, log_lines = todays_records(today)
+    for s in schedules:
+        slot = datetime.combine(today, s['sort_key'].time())
+        status, late_min = slot_outcome(s['actual_time_24h'], today, todays_events, log_lines)
+        if status is None:
+            if slot > now:
+                status = 'upcoming'
+            elif now - slot <= timedelta(minutes=DUE_GRACE_MIN):
+                status = 'due'
+            else:
+                status = 'missed'
+        s['status'] = status
+        s['late_min'] = late_min
+    return schedules
+
+
 def build_timeline(schedules):
     """Adds time_minutes to each schedule; returns (start, end, hour ticks)."""
     for s in schedules:
@@ -109,6 +136,16 @@ def hopper_card(consumption):
             status['last_refill'], "%Y-%m-%d").strftime("%b %d")
     except (ValueError, TypeError):
         status['last_refill_label'] = status['last_refill']
+    # A date is easier to act on than a percentage: when it runs dry, and
+    # when to refill so the low-food alert never has to fire
+    days_left = status.get('days_left')
+    if days_left is not None:
+        today = date.today()
+        empty_on = today + timedelta(days=days_left)
+        refill_by = today + timedelta(days=max(0, days_left - hopper.LOW_DAYS))
+        status['empty_label'] = f"{empty_on:%b} {empty_on.day}"
+        status['refill_by_label'] = ('today' if refill_by == today
+                                     else f"{refill_by:%a}, {refill_by:%b} {refill_by.day}")
     # Preselect the "what was left" guess nearest the app's own level estimate,
     # so the form confirms its guess instead of quizzing from scratch
     level = status.get('level')
@@ -120,7 +157,7 @@ def hopper_card(consumption):
 
 def index_context():
     """Everything index.html renders, minus app-level constants."""
-    schedules = mark_past_feedings(read_schedules_with_details())
+    schedules = attach_outcomes(mark_past_feedings(read_schedules_with_details()))
     recent_activity = parse_recent_activity(days=1, limit=1)
     timeline_start, timeline_end, timeline_hours = build_timeline(schedules)
 
@@ -144,4 +181,6 @@ def index_context():
         'week_summary': build_week_summary(weekly_stats),
         'consumption': consumption,
         'hopper': hopper_card(consumption),
+        'manual': manual_limit.status(),
+        'on_time': on_time_summary(events.read_all(), date.today()),
     }

@@ -762,6 +762,54 @@ body {
     transform: translate(-50%, -50%) scale(1.3);
 }
 
+/* Outcome states — what actually happened, not just "in the past".
+   .is-past in the selector outranks the portion-color fill rules above. */
+.timeline-dot.is-past.status-missed,
+.timeline-dot.status-missed {
+    background: var(--color-surface);
+    border-color: var(--color-danger);
+    border-style: dashed;
+}
+
+.timeline-dot.is-past.status-failed,
+.timeline-dot.status-failed {
+    background: var(--color-danger);
+    border-color: var(--color-danger);
+}
+
+.timeline-dot.status-due {
+    animation: dotPulse 1s ease infinite;
+}
+
+.dot-badge {
+    position: absolute;
+    bottom: calc(100% + 3px);
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.6rem;
+    font-weight: 700;
+    line-height: 1;
+    padding: 2px 4px;
+    border-radius: 999px;
+    white-space: nowrap;
+    color: #3d2a00;  /* white on amber fails contrast in both themes */
+    background: var(--color-warning);
+    pointer-events: none;
+}
+
+.status-missed .dot-badge,
+.status-failed .dot-badge {
+    color: white;
+    background: var(--color-danger);
+    min-width: 1.2em;
+    text-align: center;
+}
+
+.tooltip-status {
+    color: var(--color-text-muted);
+    font-size: 0.7rem;
+}
+
 .timeline-tooltip {
     position: absolute;
     bottom: calc(100% + 10px);
@@ -1430,39 +1478,6 @@ body {
     color: var(--color-primary);
 }
 
-.hopper-gauge {
-    height: 14px;
-    border-radius: var(--radius-sm);
-    background: var(--color-input-bg);
-    border: 1px solid var(--color-border-light);
-    overflow: hidden;
-    margin-bottom: 8px;
-}
-
-.hopper-fill {
-    height: 100%;
-    width: calc(var(--hopper-level) * 100%);
-    border-radius: inherit;
-    background: var(--color-success);
-    transition: width 0.4s ease;
-}
-
-.hopper-fill.hopper-low {
-    background: var(--color-warning);
-}
-
-.hopper-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px 12px;
-    font-size: 0.85rem;
-    color: var(--color-text-muted);
-}
-
-.hopper-capacity {
-    margin-left: auto;
-}
-
 .hopper-refill {
     margin-top: 12px;
 }
@@ -1489,4 +1504,231 @@ body {
     background: var(--color-input-bg);
     color: var(--color-text);
     font-family: var(--font-body);
+}
+
+
+/* ===== Hold to Feed ===== */
+.feed-card {
+    position: relative;
+}
+
+/* Kibble is clipped by its own overlay, not the card: overflow:hidden on
+   a grid item drops its minimum height to 0, and the viewport-fit grid
+   then squeezes the card's row until it overlaps the next card */
+.kibble-layer {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    border-radius: inherit;
+    pointer-events: none;
+}
+
+.feed-hold {
+    position: relative;
+    display: grid;
+    place-items: center;
+    padding: 9px;
+}
+
+.hold-ring {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+    pointer-events: none;
+}
+
+.hold-ring circle {
+    fill: none;
+    stroke-width: 5;
+    stroke-linecap: round;
+}
+
+.hold-ring-track {
+    stroke: var(--color-border);
+}
+
+.hold-ring-fill {
+    stroke: var(--color-accent);
+    stroke-dasharray: 100;
+    stroke-dashoffset: 100;
+    transition: stroke-dashoffset 0.2s ease-out;  /* snaps back on early release */
+}
+
+.feed-hold.holding .hold-ring-fill {
+    stroke-dashoffset: 0;
+    transition: stroke-dashoffset 0.7s linear;  /* keep in step with HOLD_MS in main.js */
+}
+
+.feed-hold.fired .hold-ring-fill {
+    stroke: var(--color-success);
+    stroke-dashoffset: 0;
+}
+
+.feed-hold.holding .feed-circle-btn {
+    transform: scale(0.94);
+}
+
+.feed-circle-btn {
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+}
+
+.feed-circle-btn:disabled {
+    background: var(--color-text-muted);
+    box-shadow: none;
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.hold-hint {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    margin-top: -0.3rem;
+}
+
+.hold-hint.nudge {
+    color: var(--color-accent-dark);
+    font-weight: 600;
+    animation: hintNudge 0.4s ease;
+}
+
+@keyframes hintNudge {
+    0%, 100% { transform: translateX(0); }
+    25%      { transform: translateX(-4px); }
+    75%      { transform: translateX(4px); }
+}
+
+.portion-segment input:disabled + .portion-segment-label {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.extras-chip {
+    font-size: 0.72rem;
+    font-weight: 500;
+    padding: 2px 10px;
+    border-radius: 999px;
+    background: var(--color-bg);
+    color: var(--color-text-muted);
+}
+
+.extras-chip.is-empty {
+    color: var(--color-accent-dark);
+}
+
+/* ===== Kibble Drop ===== */
+.kibble {
+    position: absolute;
+    width: var(--size);
+    height: calc(var(--size) * 0.8);
+    border-radius: 45% 55% 50% 50% / 55% 50% 50% 45%;
+    background: radial-gradient(circle at 35% 30%, #dba46b, #9c5f2a 70%);
+    pointer-events: none;
+    z-index: 3;
+    animation: kibbleFall 0.95s cubic-bezier(0.35, 0.1, 0.6, 1) var(--delay) both;
+}
+
+@keyframes kibbleFall {
+    0%   { opacity: 0; transform: translate(0, 0) rotate(0); }
+    10%  { opacity: 1; }
+    80%  { opacity: 1; }
+    100% { opacity: 0; transform: translate(var(--dx), 110px) rotate(var(--rot)); }
+}
+
+/* ===== Streak ===== */
+.card-label-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.card-label-row .card-label {
+    margin-bottom: 0;
+}
+
+.streak-chip {
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(243, 156, 18, 0.15);
+    color: var(--color-text);
+    white-space: nowrap;
+}
+
+.streak-chip.is-muted {
+    background: var(--color-bg);
+    color: var(--color-text-muted);
+    font-weight: 500;
+}
+
+/* ===== Hopper Visual ===== */
+.hopper-visual {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 4px;
+}
+
+.hopper-svg {
+    width: 64px;
+    height: 84px;
+    flex-shrink: 0;
+}
+
+.hopper-svg-empty { fill: var(--color-bg); }
+.hopper-svg-fill { fill: #c8894a; }
+.hopper-svg.is-low .hopper-svg-fill { fill: var(--color-warning); }
+.kibble-dot { fill: rgba(0, 0, 0, 0.16); }
+
+.hopper-svg-outline {
+    fill: none;
+    stroke: var(--color-text-muted);
+    stroke-width: 2;
+    stroke-linejoin: round;
+}
+
+.hopper-svg-spout { fill: var(--color-text-muted); }
+.hopper-svg-bowl { fill: var(--color-accent); }
+
+.hopper-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.hopper-headline {
+    font-family: var(--font-display);
+    font-size: 1.3rem;
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--color-text);
+}
+
+.hopper-lbs {
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--color-text-muted);
+}
+
+.hopper-refill-by {
+    font-weight: 600;
+    color: var(--color-primary);
+}
+
+.hopper-refill-by.is-urgent {
+    color: var(--color-accent-dark);
+}
+
+.hopper-sub {
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
 }

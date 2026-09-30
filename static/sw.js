@@ -1,4 +1,4 @@
-const CACHE_NAME = 'petfeedr-v14';
+const CACHE_NAME = 'petfeedr-v15';
 const STATIC_ASSETS = [
     '/',
     '/static/styles.css',

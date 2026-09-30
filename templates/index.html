@@ -161,14 +161,29 @@
                                 {% for sched in schedules %}
                                     {% set range = timeline_end - timeline_start %}
                                     {% set pct = ((sched.time_minutes - timeline_start) / range * 100) if range > 0 else 50 %}
-                                    <div class="timeline-dot {% if sched.is_past %}is-past{% endif %} {% if sched.is_next %}is-next{% endif %} portion-{{ sched.portion }}"
+                                    {% set status_text = {
+                                        'fed': 'Fed',
+                                        'late': 'Caught up ' ~ (sched.late_min ~ ' min ' if sched.late_min else '') ~ 'late',
+                                        'failed': 'Failed — check for a jam',
+                                        'missed': 'Missed',
+                                        'due': 'Due now',
+                                        'upcoming': 'Next' if sched.is_next else 'Upcoming'}[sched.status] %}
+                                    <div class="timeline-dot status-{{ sched.status }} {% if sched.is_past %}is-past{% endif %} {% if sched.is_next %}is-next{% endif %} portion-{{ sched.portion }}"
                                          style="--dot-pos: {{ pct }}%;"
                                          role="button" tabindex="0"
-                                         aria-label="{{ sched.actual_time_12h }}, {{ sched.portion }} portion{% if sched.is_past %}, completed{% endif %}{% if sched.is_next %}, next feeding{% endif %}">
+                                         aria-label="{{ sched.actual_time_12h }}, {{ sched.portion }} portion, {{ status_text }}">
+                                        {% if sched.status == 'late' %}
+                                            <span class="dot-badge" aria-hidden="true">+{{ sched.late_min ~ 'm' if sched.late_min else 'late' }}</span>
+                                        {% elif sched.status == 'missed' %}
+                                            <span class="dot-badge" aria-hidden="true">!</span>
+                                        {% elif sched.status == 'failed' %}
+                                            <span class="dot-badge" aria-hidden="true">✕</span>
+                                        {% endif %}
                                         <div class="timeline-tooltip">
                                             {{ sched.actual_time_12h }}<br>
                                             <span class="portion-{{ sched.portion }}">{{ sched.portion }}</span>
-                                            {% if sched.is_fixed %} 🔒{% endif %}
+                                            {% if sched.is_fixed %} 🔒{% endif %}<br>
+                                            <span class="tooltip-status">{{ status_text }}</span>
                                         </div>
                                     </div>
                                 {% endfor %}
@@ -213,27 +228,54 @@
 
                 <!-- Manual Feed -->
                 <section class="card feed-card">
+                    {% set no_extras = not manual.fits['small'] %}
                     <form action="/feed" method="post" class="feed-form">
-                        <button type="submit" class="feed-circle-btn" aria-label="Dispense food now">
-                            <span class="feed-circle-label" aria-hidden="true">Feed</span>
-                        </button>
+                        <div class="feed-hold">
+                            <svg class="hold-ring" viewBox="0 0 120 120" aria-hidden="true">
+                                <circle class="hold-ring-track" cx="60" cy="60" r="56"/>
+                                <circle class="hold-ring-fill" cx="60" cy="60" r="56" pathLength="100"/>
+                            </svg>
+                            <button type="submit" class="feed-circle-btn" {% if no_extras %}disabled{% endif %}
+                                    aria-label="{% if no_extras %}No extra feeds left today{% else %}Press and hold to dispense food now{% endif %}">
+                                <span class="feed-circle-label" aria-hidden="true">Feed</span>
+                            </button>
+                        </div>
+                        <div class="hold-hint" aria-hidden="true">{% if no_extras %}Extras reset at midnight{% else %}Hold to feed{% endif %}</div>
                         <div class="portion-segmented">
                             {% for name, (cycles, desc) in portion_sizes.items() %}
-                                <label class="portion-segment">
+                                <label class="portion-segment" {% if not manual.fits[name] %}title="More than today's extras allow"{% endif %}>
                                     <input type="radio" name="portion" value="{{ name }}"
-                                           {% if name == default_portion %}checked{% endif %}>
+                                           {% if name == default_portion %}checked{% endif %}
+                                           {% if not manual.fits[name] %}disabled{% endif %}>
                                     <span class="portion-segment-label portion-{{ name }}">{{ name[0] | upper }}</span>
                                 </label>
                             {% endfor %}
                         </div>
                         <div class="portion-description" id="portion-desc"></div>
+                        <div class="extras-chip {% if no_extras %}is-empty{% endif %}"
+                             title="Manual feeds are capped at {{ manual.allowance | cups }} a day">
+                            {% if no_extras %}
+                                No extras left today
+                            {% else %}
+                                {{ manual.remaining | cups }} of extras left today
+                            {% endif %}
+                        </div>
                     </form>
                 </section>
                 <script>const portionDescriptions = {{ portion_info | tojson }};</script>
 
                 <!-- Last 7 Days -->
                 <section class="card stats-card">
-                    <div class="card-label">Last 7 Days</div>
+                    <div class="card-label-row">
+                        <div class="card-label">Last 7 Days</div>
+                        {% if on_time.streak_days >= 2 %}
+                            <span class="streak-chip" title="{{ on_time.week_on_time }} of {{ on_time.week_total }} scheduled feeds on time this week">
+                                <span aria-hidden="true">🔥</span> {{ on_time.streak_days }}-day on-time streak
+                            </span>
+                        {% elif on_time.week_total %}
+                            <span class="streak-chip is-muted">{{ on_time.week_on_time }}/{{ on_time.week_total }} on time</span>
+                        {% endif %}
+                    </div>
                     {% if weekly_stats %}
                         <div class="bar-chart" style="--chart-max: {{ max_daily_cups }};">
                             {% for day in weekly_stats %}
@@ -296,15 +338,34 @@
                         </div>
                         <p class="setting-description">Capacity is learned from refills — when you top it up, tap "I refilled it" and give a rough guess of what was left.</p>
                     {% else %}
-                        <div class="hopper-gauge" role="img" aria-label="Hopper about {{ (hopper.level * 100) | round | int }} percent full">
-                            <div class="hopper-fill {% if hopper.level <= 0.15 %}hopper-low{% endif %}" style="--hopper-level: {{ hopper.level }};"></div>
-                        </div>
-                        <div class="hopper-meta">
-                            <span>~{{ (hopper.level * 100) | round | int }}% full{% if hopper.lbs_left is not none %} (~{{ '%g' % hopper.lbs_left }} lb left){% endif %}</span>
-                            {% if hopper.days_left is not none %}
-                                <span class="hopper-days">~{{ hopper.days_left }} day{{ 's' if hopper.days_left != 1 }} of food left</span>
-                            {% endif %}
-                            <span class="hopper-capacity">holds {% if hopper.capacity_lbs %}~{{ '%g' % hopper.capacity_lbs }} lb ({{ (hopper.capacity_lbs * 16) | round | int }} oz), {% endif %}~{{ hopper.capacity }} cups</span>
+                        {% set pct = (hopper.level * 100) | round | int %}
+                        {% set low = hopper.level <= 0.15 %}
+                        <div class="hopper-visual">
+                            <svg class="hopper-svg {% if low %}is-low{% endif %}" viewBox="0 0 64 84" role="img" aria-label="Hopper about {{ pct }} percent full">
+                                <defs>
+                                    <clipPath id="hopper-clip"><path d="M6 4 H58 L45 54 H19 Z"/></clipPath>
+                                    <pattern id="kibble-pattern" width="9" height="7" patternUnits="userSpaceOnUse">
+                                        <ellipse cx="2.5" cy="2" rx="2" ry="1.5" class="kibble-dot"/>
+                                        <ellipse cx="7" cy="5.5" rx="2" ry="1.5" class="kibble-dot"/>
+                                    </pattern>
+                                </defs>
+                                <g clip-path="url(#hopper-clip)">
+                                    <rect class="hopper-svg-empty" x="0" y="0" width="64" height="60"/>
+                                    <rect class="hopper-svg-fill" x="0" y="{{ 4 + 50 * (1 - hopper.level) }}" width="64" height="{{ 50 * hopper.level + 1 }}"/>
+                                    <rect x="0" y="{{ 4 + 50 * (1 - hopper.level) }}" width="64" height="{{ 50 * hopper.level + 1 }}" fill="url(#kibble-pattern)"/>
+                                </g>
+                                <path class="hopper-svg-outline" d="M6 4 H58 L45 54 H19 Z"/>
+                                <rect class="hopper-svg-spout" x="27" y="54" width="10" height="9" rx="2"/>
+                                <path class="hopper-svg-bowl" d="M14 72 H50 Q48 81 32 81 Q16 81 14 72 Z"/>
+                            </svg>
+                            <div class="hopper-info">
+                                <div class="hopper-headline">~{{ pct }}% full{% if hopper.lbs_left is not none %} <span class="hopper-lbs">· ~{{ '%g' % hopper.lbs_left }} lb</span>{% endif %}</div>
+                                {% if hopper.refill_by_label %}
+                                    <div class="hopper-refill-by {% if hopper.refill_by_label == 'today' %}is-urgent{% endif %}">Refill by {{ hopper.refill_by_label }}</div>
+                                    <div class="hopper-sub">~{{ hopper.days_left }} day{{ 's' if hopper.days_left != 1 }} of food · empty around {{ hopper.empty_label }}</div>
+                                {% endif %}
+                                <div class="hopper-sub">Holds {% if hopper.capacity_lbs %}~{{ '%g' % hopper.capacity_lbs }} lb ({{ (hopper.capacity_lbs * 16) | round | int }} oz), {% endif %}~{{ hopper.capacity }} cups</div>
+                            </div>
                         </div>
                     {% endif %}
                     <div class="hopper-refill">
