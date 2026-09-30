@@ -49,8 +49,14 @@ smoke() {
     [ -n "$ok" ] || fail "petfeedr.service is not active: ssh $PI_HOST 'journalctl -u petfeedr -n 40'"
     echo "  service active"
 
-    local code
-    code=$(pi "curl -s -o /tmp/ship-idx.html -w '%{http_code}' localhost:5000/" | tail -1)
+    # systemd reports "active" a second or two before Flask is listening;
+    # a single curl in that gap gets 000 (connection refused) — retry
+    local code=""
+    for _ in 1 2 3 4 5; do
+        code=$(pi "curl -s -o /tmp/ship-idx.html -w '%{http_code}' localhost:5000/" | tail -1) || true
+        [ "$code" = "200" ] && break
+        sleep 2
+    done
     [ "$code" = "200" ] || fail "Dashboard returned HTTP $code"
     echo "  dashboard 200"
 
