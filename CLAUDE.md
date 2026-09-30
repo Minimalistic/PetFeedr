@@ -27,6 +27,7 @@ dashboard.py              # Read-only view-model for the index page
 schedule_store.py         # The one parser/writer for feeding_schedules.txt
 atomicfile.py             # write_atomic(): temp + fsync + os.replace for every state file
 responses.py              # wants_json / error_response shared by route modules
+manual_limit.py           # Daily manual-feed cap (half the schedule, floor ¾ cup) + cooldown
 feeding_stats.py          # Log parsing + consumption stats (pure stdlib, unit-tested)
 hopper.py                 # Hopper level tracking; learns capacity from refill feedback
 notify.py                 # Pushover alerts (PUSHOVER_TOKEN/PUSHOVER_USER env; fail-soft)
@@ -58,6 +59,8 @@ Key invariants:
   — the stats regexes in feeding_stats.py parse only this family.
 - **State files are written with `atomicfile.write_atomic`**, never
   `open(path, 'w')` — a power cut mid-write must not leave an empty schedule.
+- **`feeder_core.slot_outcome` is the one answer to "what happened to
+  this slot"** — the startup catch-up and the dashboard both read it.
 - **On a real Pi, a missing RPi.GPIO is fatal**, not simulation (DRV8825.load_gpio).
 - **Log through `logging.getLogger('petfeedr')`**, never the root
   logger (root goes to stderr/journald, not feeding_log.txt).

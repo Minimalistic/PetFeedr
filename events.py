@@ -14,6 +14,8 @@ Event kinds and their fields:
               lbs_added, cups_per_lb_estimate, capacity_lbs_estimate
               (all null when not weighed)
   hopper_low  level, days_left
+  missed      portion, base_time, scheduled_for, late_by_min (found at startup,
+              too late to catch up)
 
 Every event carries ts (local ISO time) and sim (True on a dev box without
 GPIO) so simulated runs can be filtered out of real analysis.

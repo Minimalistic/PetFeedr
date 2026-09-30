@@ -2,31 +2,26 @@
 
 import os
 import time
-from datetime import date, datetime
+from datetime import datetime
 from urllib.parse import urlparse
 from flask import Flask, redirect, request, render_template, jsonify
 
 from feeder_core import feed_pet, STATE_LOCK, log, setup_logging
 from feeding_stats import day_feedings, PORTION_CUPS
+import manual_limit
 from servo_controller import PORTION_SIZES, DEFAULT_PORTION
 from DRV8825 import SIMULATION_MODE
 from responses import wants_json, error_response
 from schedule_routes import schedule_bp
 import dashboard
 import hopper
-import schedule_store
 
-APP_VERSION = "1.3.1"
+APP_VERSION = "1.4.0"
 MAX_REFILL_LBS = 50  # sanity bound — a typo like 700 would wreck the cups-per-lb median
 
-# Manual feeds are capped per day so a double-tap, a kid with the phone, or a
-# stray request can't empty the hopper into the bowl. The allowance is half the
-# scheduled daily total, with a floor so a light (or empty) schedule still
-# leaves room for a real top-up. Resets at midnight.
-MANUAL_CAP_FRACTION = 0.5
-MANUAL_CAP_FLOOR_CUPS = 0.75
-MANUAL_COOLDOWN_S = 60
-_last_manual_feed = None  # monotonic stamp; in-memory is fine — a restart is a natural reset
+# Cooldown between manual feeds (limits live in manual_limit.py). Monotonic
+# stamp; in-memory is fine — a restart is a natural reset
+_last_manual_feed = None
 
 # Configurable port - default 5000, override with PETFEEDR_PORT env var
 WEB_PORT = int(os.environ.get('PETFEEDR_PORT', 5000))
@@ -48,6 +43,15 @@ def reject_cross_origin_posts():
         log.warning(f"Rejected cross-origin POST {request.path} from {origin}")
         return error_response('Cross-origin request refused', 403)
     return None
+
+
+@app.template_filter('cups')
+def _cups_filter(value):
+    """0.75 → "¾ cup", 1.25 → "1¼ cups" — kitchen fractions read faster than decimals."""
+    quarters = int(round(float(value) * 4))
+    whole, frac = divmod(quarters, 4)
+    text = (str(whole) if whole else '') + ['', '¼', '½', '¾'][frac] or '0'
+    return f"{text} cup{'' if quarters <= 4 and quarters != 0 else 's'}"
 
 
 # Custom Jinja2 filter for formatting datetime objects
@@ -84,11 +88,6 @@ def day_detail(date_str):
     })
 
 
-def manual_allowance_cups():
-    scheduled = sum(PORTION_CUPS[e['portion']] for e in schedule_store.read_entries())
-    return max(MANUAL_CAP_FLOOR_CUPS, scheduled * MANUAL_CAP_FRACTION)
-
-
 @app.route('/feed', methods=['POST'])
 def trigger_feeding():
     global _last_manual_feed
@@ -102,12 +101,11 @@ def trigger_feeding():
         # None, not 0.0: monotonic() can start near zero, which would refuse
         # every feed for the first minute after boot
         since_last = None if _last_manual_feed is None else time.monotonic() - _last_manual_feed
-        if since_last is not None and since_last < MANUAL_COOLDOWN_S:
+        if since_last is not None and since_last < manual_limit.COOLDOWN_S:
             return error_response(
-                f'Just fed — try again in {int(MANUAL_COOLDOWN_S - since_last) + 1}s', 429)
-        feedings, _ = day_feedings(date.today().isoformat())
-        manual_cups = sum(f['cups'] for f in feedings if f['type'] == 'manual')
-        allowance = manual_allowance_cups()
+                f'Just fed — try again in {int(manual_limit.COOLDOWN_S - since_last) + 1}s', 429)
+        manual_cups = manual_limit.used_today_cups()
+        allowance = manual_limit.allowance_cups()
         if manual_cups + PORTION_CUPS[portion] > allowance:
             log.warning(f"Manual feed refused: {manual_cups:g} of {allowance:g} manual cups used today")
             return error_response(

@@ -241,23 +241,38 @@ CATCH_UP_WINDOW_MIN = 60  # later than this, a meal shifts the pet's day — lea
 FED_MATCH_MIN = 2         # a scheduled "completed" line this close to a slot counts as that slot
 # Written just before a catch-up dispense; its "completed" line lands late,
 # outside FED_MATCH_MIN, so this line is what marks the slot handled in the log
-CATCH_UP_RE = re.compile(r'^(?P<date>\d{4}-\d{2}-\d{2}) .* Catching up missed (?P<slot>\d{2}:\d{2}) feeding')
+CATCH_UP_RE = re.compile(r'^(?P<date>\d{4}-\d{2}-\d{2}) .* Catching up missed '
+                         r'(?P<slot>\d{2}:\d{2}) feeding \((?P<late>\d+) min late\)')
 
 
-def _slot_already_handled(actual_time, today, todays_events, log_lines):
-    """True if the slot has a dispense or failure in the journal, or a
-    scheduled "Feeding completed" log line within FED_MATCH_MIN of it.
-    The log fallback matters: the journal write is fail-soft, and a
-    missing event must never turn into a second meal. A failure counts
-    as handled — the Pi already paged, and a jam shouldn't be retried
-    blind on every restart."""
-    if any(e.get('scheduled_for') == actual_time and e.get('event') in ('dispense', 'failure')
-           for e in todays_events):
-        return True
+def slot_outcome(actual_time, today, todays_events, log_lines):
+    """What happened to one of today's slots: (status, late_min).
+
+    status is 'fed', 'late' (caught up after a restart), 'failed',
+    'missed' (too late to catch up), or None when nothing is recorded yet.
+    One definition shared by the startup catch-up and the dashboard, so
+    what the timeline shows is what the feeder believes.
+
+    The journal is checked first; the log is the fallback because journal
+    writes are fail-soft, and a missing event must never turn into a
+    second meal.
+    """
+    found = {}
+    for e in todays_events:
+        if e.get('scheduled_for') == actual_time:
+            found.setdefault(e.get('event'), e)
+    if 'dispense' in found:
+        late = found['dispense'].get('late_by_min')
+        return ('late', late) if late else ('fed', None)
+    if 'failure' in found:
+        return 'failed', None
+    if 'missed' in found:
+        return 'missed', found['missed'].get('late_by_min')
+
     for line in log_lines:
         m = CATCH_UP_RE.match(line)
         if m and m['date'] == today.isoformat() and m['slot'] == actual_time:
-            return True  # attempted already; a failed catch-up paged, don't loop on it
+            return 'late', int(m['late'])
     slot = datetime.combine(today, datetime.strptime(actual_time, "%H:%M").time())
     for line in log_lines:
         m = COMPLETED_RE.match(line.strip())
@@ -265,8 +280,14 @@ def _slot_already_handled(actual_time, today, todays_events, log_lines):
             continue
         fed_at = datetime.strptime(f"{m['date']} {m['time']}", "%Y-%m-%d %H:%M:%S")
         if abs(fed_at - slot) <= timedelta(minutes=FED_MATCH_MIN):
-            return True
-    return False
+            return 'fed', None
+    return None, None
+
+
+def todays_records(today):
+    """(today's journal events, all log lines) — the inputs slot_outcome reads."""
+    todays_events = [e for e in events.read_all() if e.get('ts', '').startswith(today.isoformat())]
+    return todays_events, read_all_log_lines()
 
 
 def catch_up_missed(now=None):
@@ -280,18 +301,22 @@ def catch_up_missed(now=None):
     today = now.date()
     caught_up = []
     with STATE_LOCK:
-        todays_events = [e for e in events.read_all() if e.get('ts', '').startswith(today.isoformat())]
-        log_lines = read_all_log_lines()
+        todays_events, log_lines = todays_records(today)
         for entry in load_todays_schedule() or []:
             slot = datetime.combine(today, datetime.strptime(entry['actual_time'], "%H:%M").time())
             late = now - slot
-            if late <= timedelta(0) or _slot_already_handled(
-                    entry['actual_time'], today, todays_events, log_lines):
+            # Any recorded outcome — including a failure or an earlier
+            # catch-up attempt — means hands off: never a second meal
+            if late <= timedelta(0) or slot_outcome(
+                    entry['actual_time'], today, todays_events, log_lines)[0]:
                 continue
             late_min = int(late.total_seconds() // 60)
             if late > timedelta(minutes=CATCH_UP_WINDOW_MIN):
                 log.warning(f"Missed {entry['actual_time']} feeding ({late_min} min ago) — "
                             "too late to catch up automatically")
+                # Recorded so the dashboard and streak show the miss honestly
+                events.record('missed', portion=entry['portion'], base_time=entry['base_time'],
+                              scheduled_for=entry['actual_time'], late_by_min=late_min)
                 continue
             log.info(f"Catching up missed {entry['actual_time']} feeding ({late_min} min late)")
             if feed_pet(portion=entry['portion'], base_time=entry['base_time'],

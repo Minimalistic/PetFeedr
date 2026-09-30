@@ -202,3 +202,39 @@ def day_feedings(date_str, lines=None):
 
     total_cups = sum(f['cups'] for f in feedings)
     return feedings, total_cups
+
+
+def on_time_summary(events, today):
+    """On-time streak and this week's record from the event journal.
+
+    Only schedule-driven events count (scheduled_for set). A day is good
+    when it has at least one scheduled dispense and nothing bad: no
+    failure, no miss, no late catch-up. Today counts once it has a feed;
+    an empty today (before the first slot) neither extends nor breaks.
+    """
+    by_day = {}
+    for e in events:
+        if not e.get('scheduled_for') or not e.get('ts'):
+            continue
+        day = by_day.setdefault(e['ts'][:10], {'on_time': 0, 'bad': 0})
+        if e.get('event') == 'dispense' and not e.get('late_by_min'):
+            day['on_time'] += 1
+        elif e.get('event') in ('dispense', 'failure', 'missed'):
+            day['bad'] += 1
+
+    streak = 0
+    d = today
+    if today.isoformat() not in by_day:
+        d = today - timedelta(days=1)
+    while True:
+        day = by_day.get(d.isoformat())
+        if not day or day['bad'] or not day['on_time']:
+            break
+        streak += 1
+        d -= timedelta(days=1)
+
+    week = [by_day.get((today - timedelta(days=i)).isoformat(), {'on_time': 0, 'bad': 0})
+            for i in range(7)]
+    on_time = sum(w['on_time'] for w in week)
+    return {'streak_days': streak, 'week_on_time': on_time,
+            'week_total': on_time + sum(w['bad'] for w in week)}
