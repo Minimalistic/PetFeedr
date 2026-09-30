@@ -61,6 +61,11 @@ Key invariants:
   `open(path, 'w')` — a power cut mid-write must not leave an empty schedule.
 - **`feeder_core.slot_outcome` is the one answer to "what happened to
   this slot"** — the startup catch-up and the dashboard both read it.
+- **Scheduled jobs run `feeder_core.scheduled_feed`, never `feed_pet`
+  directly** — it skips a slot already handled today. The Pi has no
+  battery clock; after a power cut it boots on a stale time and jumps
+  forward at NTP sync, which would otherwise re-fire a fed slot. Startup
+  also holds the scheduler for that sync (`wait_for_clock_sync`, 10 min cap).
 - **On a real Pi, a missing RPi.GPIO is fatal**, not simulation (DRV8825.load_gpio).
 - **Log through `logging.getLogger('petfeedr')`**, never the root
   logger (root goes to stderr/journald, not feeding_log.txt).

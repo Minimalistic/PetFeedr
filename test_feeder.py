@@ -1155,3 +1155,85 @@ class TestDashboardExtras(TempCwd):
         for status in ('status-fed', 'status-late', 'status-failed', 'status-missed', 'status-upcoming'):
             self.assertIn(status, html)
         self.assertIn('+7m', html)
+
+
+class TestScheduledFeedIdempotent(TempCwd):
+    def setUp(self):
+        super().setUp()
+        schedule.clear()
+
+    def tearDown(self):
+        schedule.clear()
+        super().tearDown()
+
+    def test_unfed_slot_dispenses(self):
+        with patch('feeder_core.feed_pet', return_value=True) as mock_feed:
+            self.assertTrue(feeder_core.scheduled_feed('small', '03:00', '03:00'))
+        mock_feed.assert_called_once_with(portion='small', base_time='03:00', scheduled_for='03:00')
+
+    def test_slot_already_fed_today_is_skipped(self):
+        with open('feeding_events.jsonl', 'w') as f:
+            f.write(json.dumps({'ts': f'{date.today().isoformat()}T03:00:01', 'event': 'dispense',
+                                'scheduled_for': '03:00'}) + '\n')
+        with patch('feeder_core.feed_pet') as mock_feed:
+            self.assertFalse(feeder_core.scheduled_feed('small', '03:00', '03:00'))
+        mock_feed.assert_not_called()
+
+    def test_yesterdays_feed_does_not_block_today(self):
+        yesterday = (date.today() - timedelta(days=1)).isoformat()
+        with open('feeding_events.jsonl', 'w') as f:
+            f.write(json.dumps({'ts': f'{yesterday}T03:00:01', 'event': 'dispense',
+                                'scheduled_for': '03:00'}) + '\n')
+        with patch('feeder_core.feed_pet', return_value=True) as mock_feed:
+            feeder_core.scheduled_feed('small', '03:00', '03:00')
+        mock_feed.assert_called_once()
+
+    def test_power_cut_replay_does_not_double_feed(self):
+        # 2026-09-30: fed at 03:00, power cut, Pi boots on a clock 38 min slow.
+        # 03:00 looks upcoming again, gets registered, and fires when NTP jumps
+        # the clock forward. The motor must run once, not twice.
+        feeder_core.save_todays_schedule([{'base_time': '03:00', 'actual_time': '03:00',
+                                           'portion': 'small', 'is_fixed': True, 'randomized': False}])
+        with patch('feeder_core.trigger_servo', return_value=0.3) as motor, \
+             patch('feeder_core.notify.send'):
+            feeder_core.resync_today()
+            schedule.jobs[0].run()   # the real 03:00 feed, before the outage
+            feeder_core.resync_today()  # reboot on the stale clock re-registers it
+            schedule.jobs[0].run()   # clock jumps; the overdue job fires
+        self.assertEqual(motor.call_count, 1)
+
+
+class TestClockWait(unittest.TestCase):
+    def test_off_pi_returns_immediately(self):
+        sleeps = []
+        self.assertTrue(feeder_core.wait_for_clock_sync(is_pi=False, flag='/nonexistent', sleep=sleeps.append))
+        self.assertEqual(sleeps, [])
+
+    def test_already_synced_returns_immediately(self):
+        with tempfile.NamedTemporaryFile() as flag:
+            self.assertTrue(feeder_core.wait_for_clock_sync(is_pi=True, flag=flag.name,
+                                                            sleep=lambda s: self.fail("slept")))
+
+    def test_waits_until_flag_appears(self):
+        with tempfile.TemporaryDirectory() as d:
+            flag = os.path.join(d, 'synchronized')
+            ticks = []
+
+            def fake_sleep(seconds):
+                ticks.append(seconds)
+                if len(ticks) == 3:
+                    open(flag, 'w').close()
+
+            self.assertTrue(feeder_core.wait_for_clock_sync(
+                is_pi=True, flag=flag, sleep=fake_sleep, monotonic=lambda: len(ticks) * 5))
+            self.assertEqual(len(ticks), 3)
+
+    def test_timeout_proceeds_and_alerts(self):
+        ticks = []
+        with patch('feeder_core.notify.send') as mock_send:
+            synced = feeder_core.wait_for_clock_sync(
+                timeout_s=20, is_pi=True, flag='/nonexistent/flag',
+                sleep=ticks.append, monotonic=lambda: len(ticks) * 5)
+        self.assertFalse(synced)  # feeds anyway — no network must not mean no food
+        self.assertEqual(len(ticks), 4)
+        self.assertIn("without a synced clock", mock_send.call_args[0][0])
