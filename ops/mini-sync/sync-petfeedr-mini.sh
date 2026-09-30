@@ -15,21 +15,23 @@ ALERT_ENV="${PETFEEDR_ALERT_ENV:-$HOME/.config/petfeedr/pushover.env}"
 
 mkdir -p "$STORE/logs"
 
+# Chained with && on purpose: `set -e` is ignored inside a function called as
+# an `if` condition, so without the chain a failed copy mid-pull went unnoticed
+# and only the last command's status counted.
 pull() {
-  set -e
-  # scp, not rsync: the journal doesn't exist until the first event is written,
-  # and openrsync (macOS) has no --ignore-missing-args to tolerate that.
-  scp -q -o ConnectTimeout=15 "$PI_HOST:$PI_PATH/hopper.json" "$STORE/hopper.json"
+  # scp, not rsync: openrsync (macOS) has no --ignore-missing-args for files
+  # that may not exist yet.
+  scp -q -o ConnectTimeout=15 "$PI_HOST:$PI_PATH/hopper.json" "$STORE/hopper.json" &&
   # The schedule is the one piece of config not in git — kept here for SD-card restores
-  scp -q -o ConnectTimeout=15 "$PI_HOST:$PI_PATH/feeding_schedules.txt" "$STORE/feeding_schedules.txt"
-  scp -q -o ConnectTimeout=15 "$PI_HOST:$PI_PATH/todays_schedule.json" "$STORE/todays_schedule.json"
-  scp -q -o ConnectTimeout=15 "$PI_HOST:$PI_PATH/feeding_events.jsonl" "$STORE/feeding_events.jsonl" \
-    || echo "no event journal on the Pi yet"
+  scp -q -o ConnectTimeout=15 "$PI_HOST:$PI_PATH/feeding_schedules.txt" "$STORE/feeding_schedules.txt" &&
+  scp -q -o ConnectTimeout=15 "$PI_HOST:$PI_PATH/todays_schedule.json" "$STORE/todays_schedule.json" &&
+  { scp -q -o ConnectTimeout=15 "$PI_HOST:$PI_PATH/feeding_events.jsonl" "$STORE/feeding_events.jsonl" \
+      || echo "no event journal on the Pi yet"; } &&
   # No --delete: rotated logs accumulate here after the Pi ages them out.
   rsync -az --timeout=30 "$PI_HOST:$PI_PATH/feeding_log.txt*" "$STORE/logs/"
 }
 
-if (pull); then
+if pull; then
   date +%s > "$STORE/last_contact"
   # The watchdog needs 15-min freshness; the vault note doesn't — rendering
   # hourly keeps iCloud from syncing a new "updated:" stamp four times an hour
