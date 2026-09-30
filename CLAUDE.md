@@ -13,7 +13,7 @@ No database — schedules and logs are flat files.
 - **Web framework**: Flask
 - **Scheduling**: `schedule` library (in-process)
 - **Hardware**: DRV8825 stepper motor driver via `RPi.GPIO`
-- **Simulation mode**: auto-enabled when `RPi.GPIO` is unavailable (dev on Mac)
+- **Simulation mode**: auto-enabled when `RPi.GPIO` is unavailable off a Pi (dev on Mac); on a Pi that is a hard error
 - **Frontend**: Vanilla JS PWA — `static/main.js`, `static/sw.js`, `static/manifest.json`
 
 ## Key Files
@@ -21,12 +21,17 @@ No database — schedules and logs are flat files.
 ```
 PetFeedr.py              # Entry point: main schedule loop + Flask daemon thread (one process)
 feeder_core.py            # Shared core: logging, STATE_LOCK, feed_pet, randomization, resync
-web_interface.py          # Flask routes (also runs standalone as a UI-only dev server)
+web_interface.py          # Flask app: index, feed (manual cap + cooldown), refill, CSRF Origin guard
+schedule_routes.py        # Blueprint: add/delete/toggle/portion edits to the schedule
+dashboard.py              # Read-only view-model for the index page
+schedule_store.py         # The one parser/writer for feeding_schedules.txt
+atomicfile.py             # write_atomic(): temp + fsync + os.replace for every state file
+responses.py              # wants_json / error_response shared by route modules
 feeding_stats.py          # Log parsing + consumption stats (pure stdlib, unit-tested)
 hopper.py                 # Hopper level tracking; learns capacity from refill feedback
 notify.py                 # Pushover alerts (PUSHOVER_TOKEN/PUSHOVER_USER env; fail-soft)
 servo_controller.py       # Motor control: portion sizes, dispense cycles, anti-jam agitation
-DRV8825.py                # GPIO abstraction; auto-falls back to mock_gpio.py in sim mode
+DRV8825.py                # GPIO abstraction; falls back to mock_gpio.py off-Pi only
 mock_gpio.py              # Simulation stub for RPi.GPIO
 test_feeder.py            # unittest suite (python3 -m unittest)
 feeding_schedules.txt     # Persistent schedule store: "HH:MM,portion[,fixed]"
@@ -35,6 +40,8 @@ todays_schedule.json      # Today's randomized schedule; source of truth for tod
 hopper.json               # Hopper counter + learned capacity estimates
 deploy.sh                 # rsync-based deploy to Pi with SSH multiplexing
 setup-pi.sh               # One-time Pi setup (venv, systemd unit w/ EnvironmentFile)
+ops/mini-sync/            # Mini pulls Pi state every 15 min, renders vault note, runs watchdog.py
+ops/RUNBOOKS/restore-pi.md  # Dead SD card → working feeder
 ```
 
 Key invariants:
@@ -49,6 +56,9 @@ Key invariants:
 - **The "Feeding completed" log line is the single dispense record**
   (tagged `, manual` / `, scheduled`). Don't add other countable lines
   — the stats regexes in feeding_stats.py parse only this family.
+- **State files are written with `atomicfile.write_atomic`**, never
+  `open(path, 'w')` — a power cut mid-write must not leave an empty schedule.
+- **On a real Pi, a missing RPi.GPIO is fatal**, not simulation (DRV8825.load_gpio).
 - **Log through `logging.getLogger('petfeedr')`**, never the root
   logger (root goes to stderr/journald, not feeding_log.txt).
 
