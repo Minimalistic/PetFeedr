@@ -7,7 +7,8 @@ off the Pi by the mini for long-term stats.
 
 Event kinds and their fields:
   dispense    portion, cups, source, duration_s, base_time, scheduled_for,
-              hopper_cups (counter after this dispense)
+              hopper_cups (counter after this dispense), late_by_min
+              (minutes late when a startup catch-up dispensed it, else null)
   failure     portion, source, error, base_time, scheduled_for
   refill      remaining_pct, cups_before, capacity_estimate, capacity,
               lbs_added, cups_per_lb_estimate, capacity_lbs_estimate

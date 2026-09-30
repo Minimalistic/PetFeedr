@@ -7,6 +7,7 @@ the entry script itself (which would run twice as __main__ and PetFeedr).
 
 import os
 import random
+import re
 import json
 import schedule
 import logging
@@ -14,7 +15,8 @@ import threading
 from logging.handlers import TimedRotatingFileHandler
 from datetime import datetime, timedelta, date
 from servo_controller import trigger_servo, DEFAULT_PORTION
-from feeding_stats import PORTION_CUPS, parse_weekly_stats, calculate_consumption_rate
+from feeding_stats import (PORTION_CUPS, COMPLETED_RE, parse_weekly_stats,
+                           calculate_consumption_rate, read_all_log_lines)
 import hopper
 import notify
 import events
@@ -66,14 +68,16 @@ def setup_logging(console_only=False):
 TODAYS_SCHEDULE_FILE = 'todays_schedule.json'
 
 
-def feed_pet(portion=DEFAULT_PORTION, source='scheduled', base_time=None, scheduled_for=None):
+def feed_pet(portion=DEFAULT_PORTION, source='scheduled', base_time=None, scheduled_for=None,
+             late_by_min=None):
     """Feed the pet with the specified portion size. Returns True on success.
 
     Locked so a manual feed (Flask thread) can never drive the motor
     concurrently with a scheduled feed (main thread). The servo's
     "Feeding completed" line is the log record the stats parse; the
     event journal gets the same dispense with its numbers (base_time and
-    scheduled_for are the schedule's HH:MM pair, None for manual feeds).
+    scheduled_for are the schedule's HH:MM pair, None for manual feeds;
+    late_by_min is set only by a startup catch-up).
 
     A dispense failure is the worst failure mode this device has — a
     silently unfed pet — so it pushes a phone notification, not just a log.
@@ -93,7 +97,7 @@ def feed_pet(portion=DEFAULT_PORTION, source='scheduled', base_time=None, schedu
         events.record('dispense', portion=portion, cups=cups, source=source,
                       duration_s=round(duration, 2) if isinstance(duration, (int, float)) else None,
                       base_time=base_time, scheduled_for=scheduled_for,
-                      hopper_cups=hopper_cups)
+                      hopper_cups=hopper_cups, late_by_min=late_by_min)
         return True
 
 
@@ -231,6 +235,71 @@ def ensure_today():
             todays = generate_todays_schedule()
         resync_today()
         return todays
+
+
+CATCH_UP_WINDOW_MIN = 60  # later than this, a meal shifts the pet's day — leave it to a human
+FED_MATCH_MIN = 2         # a scheduled "completed" line this close to a slot counts as that slot
+# Written just before a catch-up dispense; its "completed" line lands late,
+# outside FED_MATCH_MIN, so this line is what marks the slot handled in the log
+CATCH_UP_RE = re.compile(r'^(?P<date>\d{4}-\d{2}-\d{2}) .* Catching up missed (?P<slot>\d{2}:\d{2}) feeding')
+
+
+def _slot_already_handled(actual_time, today, todays_events, log_lines):
+    """True if the slot has a dispense or failure in the journal, or a
+    scheduled "Feeding completed" log line within FED_MATCH_MIN of it.
+    The log fallback matters: the journal write is fail-soft, and a
+    missing event must never turn into a second meal. A failure counts
+    as handled — the Pi already paged, and a jam shouldn't be retried
+    blind on every restart."""
+    if any(e.get('scheduled_for') == actual_time and e.get('event') in ('dispense', 'failure')
+           for e in todays_events):
+        return True
+    for line in log_lines:
+        m = CATCH_UP_RE.match(line)
+        if m and m['date'] == today.isoformat() and m['slot'] == actual_time:
+            return True  # attempted already; a failed catch-up paged, don't loop on it
+    slot = datetime.combine(today, datetime.strptime(actual_time, "%H:%M").time())
+    for line in log_lines:
+        m = COMPLETED_RE.match(line.strip())
+        if not m or m['date'] != today.isoformat() or m['source'] == 'manual':
+            continue
+        fed_at = datetime.strptime(f"{m['date']} {m['time']}", "%Y-%m-%d %H:%M:%S")
+        if abs(fed_at - slot) <= timedelta(minutes=FED_MATCH_MIN):
+            return True
+    return False
+
+
+def catch_up_missed(now=None):
+    """Startup: dispense today's feedings that came due while the process
+    was down (restart, deploy, power blip). resync_today() re-registers a
+    passed time for tomorrow, so without this a restart at 07:02 silently
+    skips breakfast. Only within CATCH_UP_WINDOW_MIN; older misses are
+    logged and left to the mini's watchdog, which pages about them.
+    Returns the list of actual_times that were caught up."""
+    now = now or datetime.now()
+    today = now.date()
+    caught_up = []
+    with STATE_LOCK:
+        todays_events = [e for e in events.read_all() if e.get('ts', '').startswith(today.isoformat())]
+        log_lines = read_all_log_lines()
+        for entry in load_todays_schedule() or []:
+            slot = datetime.combine(today, datetime.strptime(entry['actual_time'], "%H:%M").time())
+            late = now - slot
+            if late <= timedelta(0) or _slot_already_handled(
+                    entry['actual_time'], today, todays_events, log_lines):
+                continue
+            late_min = int(late.total_seconds() // 60)
+            if late > timedelta(minutes=CATCH_UP_WINDOW_MIN):
+                log.warning(f"Missed {entry['actual_time']} feeding ({late_min} min ago) — "
+                            "too late to catch up automatically")
+                continue
+            log.info(f"Catching up missed {entry['actual_time']} feeding ({late_min} min late)")
+            if feed_pet(portion=entry['portion'], base_time=entry['base_time'],
+                        scheduled_for=entry['actual_time'], late_by_min=late_min):
+                caught_up.append(entry['actual_time'])
+                notify.send(f"Caught up the {entry['actual_time']} feeding {late_min} min late "
+                            "after a restart.", priority=-1)
+    return caught_up
 
 
 def save_todays_schedule(schedule_data):
