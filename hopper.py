@@ -15,6 +15,7 @@ import logging
 from datetime import date
 from statistics import median
 import events
+from atomicfile import write_atomic
 
 log = logging.getLogger('petfeedr')
 
@@ -41,7 +42,11 @@ def load_state():
     try:
         with open(HOPPER_FILE) as f:
             state = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
+    except FileNotFoundError:
+        state = _default_state()
+    except json.JSONDecodeError as e:
+        # Learned capacity is lost; say so rather than silently start over
+        log.warning(f"{HOPPER_FILE} is corrupt ({e}) — resetting hopper state")
         state = _default_state()
     for key, value in _default_state().items():
         state.setdefault(key, value)
@@ -49,8 +54,7 @@ def load_state():
 
 
 def save_state(state):
-    with open(HOPPER_FILE, 'w') as f:
-        json.dump(state, f, indent=2)
+    write_atomic(HOPPER_FILE, json.dumps(state, indent=2))
 
 
 def capacity_cups(state):

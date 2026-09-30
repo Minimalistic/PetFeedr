@@ -1,3 +1,5 @@
-# Core dependencies (work on all platforms)
-Flask>=3.0.0
-schedule>=1.2.0
+# Core dependencies (work on all platforms). Exact pins — the versions the
+# Pi runs in production; Dependabot proposes bumps. A fresh-SD rebuild must
+# reproduce this install, not whatever is newest that day.
+Flask==3.1.2
+schedule==1.2.2

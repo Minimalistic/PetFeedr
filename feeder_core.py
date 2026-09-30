@@ -13,11 +13,13 @@ import logging
 import threading
 from logging.handlers import TimedRotatingFileHandler
 from datetime import datetime, timedelta, date
-from servo_controller import trigger_servo, PORTION_SIZES, DEFAULT_PORTION
+from servo_controller import trigger_servo, DEFAULT_PORTION
 from feeding_stats import PORTION_CUPS, parse_weekly_stats, calculate_consumption_rate
 import hopper
 import notify
 import events
+import schedule_store
+from atomicfile import write_atomic
 
 # One lock for everything that touches the schedule files, the job registry,
 # or the motor. The `schedule` library has no thread safety of its own, and
@@ -83,7 +85,8 @@ def feed_pet(portion=DEFAULT_PORTION, source='scheduled', base_time=None, schedu
             log.exception(f"Feeding failed ({portion} portion, {source}): {e}")
             notify.send(f"Feeding FAILED ({portion} portion, {source}): {e} — "
                         "the motor may be jammed.", priority=1)
-            events.record('failure', portion=portion, source=source, error=str(e))
+            events.record('failure', portion=portion, source=source, error=str(e),
+                          base_time=base_time, scheduled_for=scheduled_for)
             return False
         cups = PORTION_CUPS.get(portion, 0.25)
         hopper_cups = _track_hopper(cups)
@@ -100,7 +103,7 @@ def _track_hopper(cups):
     Tracking must never break a feeding that already succeeded."""
     try:
         state = hopper.record_dispense(cups)
-        rate = calculate_consumption_rate(parse_weekly_stats())
+        rate = calculate_consumption_rate(parse_weekly_stats(), cups_per_lb=hopper.cups_per_lb(state))
         message = hopper.check_low(rate['daily_cups'] if rate else None)
         if message:
             log.info(message)
@@ -109,29 +112,6 @@ def _track_hopper(cups):
     except Exception as e:
         log.warning(f"Hopper tracking failed: {e}")
         return None
-
-
-def parse_schedule_line(line):
-    """Parse a schedule line into components.
-
-    Format: "HH:MM,portion[,fixed]"
-    Returns: (time_str, portion, is_fixed)
-    """
-    parts = line.strip().split(',')
-    time_str = parts[0].strip()
-
-    portion = DEFAULT_PORTION
-    is_fixed = False
-
-    if len(parts) > 1:
-        portion = parts[1].strip()
-        if portion not in PORTION_SIZES:
-            portion = DEFAULT_PORTION
-
-    if len(parts) > 2 and parts[2].strip().lower() == 'fixed':
-        is_fixed = True
-
-    return time_str, portion, is_fixed
 
 
 def apply_random_offset(time_str, range_minutes, all_times):
@@ -179,29 +159,24 @@ def generate_todays_schedule():
     range_minutes = 30
 
     with STATE_LOCK:
-        if not os.path.isfile('feeding_schedules.txt'):
-            open('feeding_schedules.txt', 'w').close()
-            log.info("feeding_schedules.txt not found. An empty file has been created.")
+        entries = schedule_store.read_entries()
+        if not entries:
+            # A missing or empty schedule means nothing gets fed today. That's
+            # never the steady state (a dead SD write, a bad restore), so page.
+            if not schedule_store.exists():
+                open(schedule_store.SCHEDULES_FILE, 'w').close()
+                log.warning(f"{schedule_store.SCHEDULES_FILE} not found. An empty file has been created.")
+            else:
+                log.warning(f"{schedule_store.SCHEDULES_FILE} is empty. Starting with an empty schedule.")
+            notify.send("No feedings are scheduled today — check the feeder's schedule.", priority=1)
             save_todays_schedule([])
             return []
 
         todays_schedule = []
         scheduled_times = []  # Track times to avoid conflicts
 
-        with open('feeding_schedules.txt', 'r') as file:
-            lines = file.readlines()
-
-        if len(lines) == 0:
-            log.warning("feeding_schedules.txt is empty. Starting with an empty schedule.")
-            save_todays_schedule([])
-            return []
-
-        for line in lines:
-            line = line.strip()
-            if not line:
-                continue
-
-            time_str, portion, is_fixed = parse_schedule_line(line)
+        for entry in entries:
+            time_str, portion, is_fixed = entry['time'], entry['portion'], entry['is_fixed']
 
             # Apply randomization if not fixed
             if not is_fixed:
@@ -265,8 +240,7 @@ def save_todays_schedule(schedule_data):
         'schedule': schedule_data
     }
     try:
-        with open(TODAYS_SCHEDULE_FILE, 'w') as f:
-            json.dump(data, f, indent=2)
+        write_atomic(TODAYS_SCHEDULE_FILE, json.dumps(data, indent=2))
     except Exception as e:
         log.error(f"Error saving today's schedule: {e}")
 

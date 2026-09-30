@@ -14,7 +14,8 @@ import schedule
 
 import feeder_core
 import feeding_stats
-from feeder_core import parse_schedule_line, apply_random_offset
+from feeder_core import apply_random_offset
+from schedule_store import parse_line as parse_schedule_line
 
 
 class TestParseScheduleLine(unittest.TestCase):
@@ -33,10 +34,10 @@ class TestParseScheduleLine(unittest.TestCase):
     def test_whitespace_tolerated(self):
         self.assertEqual(parse_schedule_line(" 08:00 , medium , FIXED \n"), ("08:00", "medium", True))
 
-    def test_legacy_fixed_in_portion_slot_not_recognized(self):
-        # Quirk pinned: "HH:MM,fixed" is NOT treated as fixed by the scheduler
-        # (the web UI displays it as fixed — known inconsistency).
-        self.assertEqual(parse_schedule_line("08:00,fixed"), ("08:00", "small", False))
+    def test_legacy_fixed_in_portion_slot_is_fixed(self):
+        # One parser now: the scheduler honors "HH:MM,fixed" the way the UI
+        # always displayed it (they used to disagree).
+        self.assertEqual(parse_schedule_line("08:00,fixed"), ("08:00", "small", True))
 
 
 class TestApplyRandomOffset(unittest.TestCase):
@@ -654,3 +655,279 @@ class TestRenderNote(TempCwd):
         text = self.rn.render([], [], {}, now=datetime(2026, 9, 10, 17))
         self.assertIn('learning capacity', text)
         self.assertIn('No feedings recorded yet', text)
+
+
+class TestScheduleStore(TempCwd):
+    """feeding_schedules.txt round-trips and crash-safe writes."""
+
+    def test_round_trip_normalizes_legacy_lines(self):
+        import schedule_store
+        with open('feeding_schedules.txt', 'w') as f:
+            f.write("08:00,fixed\n\n 12:00 , large \n")
+        schedule_store.write_entries(schedule_store.read_entries())
+        with open('feeding_schedules.txt') as f:
+            self.assertEqual(f.read(), "08:00,small,fixed\n12:00,large\n")
+
+    def test_missing_file_reads_empty(self):
+        import schedule_store
+        self.assertEqual(schedule_store.read_entries(), [])
+
+    def test_failed_write_leaves_original_and_no_debris(self):
+        # The power-cut case: if the swap never happens, the old file survives intact
+        import atomicfile
+        with open('state.txt', 'w') as f:
+            f.write("original")
+        with patch('atomicfile.os.replace', side_effect=OSError("power cut")):
+            with self.assertRaises(OSError):
+                atomicfile.write_atomic('state.txt', "new")
+        with open('state.txt') as f:
+            self.assertEqual(f.read(), "original")
+        self.assertEqual(os.listdir('.'), ['state.txt'])
+
+    def test_missing_schedule_file_pages(self):
+        with patch('feeder_core.notify.send') as mock_send:
+            self.assertEqual(feeder_core.generate_todays_schedule(), [])
+        self.assertIn("No feedings", mock_send.call_args[0][0])
+        self.assertTrue(os.path.isfile('feeding_schedules.txt'))
+
+    def test_nonempty_schedule_does_not_page(self):
+        with open('feeding_schedules.txt', 'w') as f:
+            f.write("08:00,small,fixed\n")
+        with patch('feeder_core.notify.send') as mock_send:
+            feeder_core.generate_todays_schedule()
+        mock_send.assert_not_called()
+
+
+class TestScheduleRoutes(TempCwd):
+    def setUp(self):
+        super().setUp()
+        schedule.clear()
+        import web_interface
+        self.client = web_interface.app.test_client()
+        self.json = {'Accept': 'application/json'}
+
+    def tearDown(self):
+        schedule.clear()
+        super().tearDown()
+
+    def _file(self):
+        with open('feeding_schedules.txt') as f:
+            return f.read()
+
+    def test_add_rejects_malformed_time_without_writing(self):
+        for bad in ['7:5', '25:00', 'noon', '']:
+            resp = self.client.post('/add', data={'feeding_time': bad}, headers=self.json)
+            self.assertEqual(resp.status_code, 400, bad)
+        self.assertFalse(os.path.exists('feeding_schedules.txt'))
+
+    def test_add_then_duplicate_conflicts(self):
+        resp = self.client.post('/add', data={'feeding_time': '23:58', 'portion': 'large'},
+                                headers=self.json)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(self._file(), "23:58,large,fixed\n")
+        resp = self.client.post('/add', data={'feeding_time': '23:58'}, headers=self.json)
+        self.assertEqual(resp.status_code, 409)
+
+    def test_toggle_legacy_fixed_line_randomizes_it(self):
+        with open('feeding_schedules.txt', 'w') as f:
+            f.write("08:00,fixed\n")
+        self.client.post('/toggle_fixed', data={'base_time': '08:00'}, headers=self.json)
+        self.assertEqual(self._file(), "08:00,small\n")
+
+    def test_toggle_unknown_time_is_404(self):
+        resp = self.client.post('/toggle_fixed', data={'base_time': '09:00'}, headers=self.json)
+        self.assertEqual(resp.status_code, 404)
+
+    def test_update_portion_and_delete(self):
+        with open('feeding_schedules.txt', 'w') as f:
+            f.write("08:00,small,fixed\n12:00,small\n")
+        self.client.post('/update_portion', data={'base_time': '08:00', 'portion': 'large'},
+                         headers=self.json)
+        self.client.post('/delete', data={'base_time': '12:00'}, headers=self.json)
+        self.assertEqual(self._file(), "08:00,large,fixed\n")
+
+
+class TestLearnedCupsPerLb(unittest.TestCase):
+    def test_consumption_uses_learned_ratio(self):
+        week = [{'total_cups': 2.0, 'total_feedings': 4}]
+        self.assertEqual(feeding_stats.calculate_consumption_rate(week)['daily_lbs'], 0.5)
+        self.assertEqual(feeding_stats.calculate_consumption_rate(
+            week, cups_per_lb=5.0)['daily_lbs'], 0.4)
+
+
+class TestManualFeedGuards(TempCwd):
+    def setUp(self):
+        super().setUp()
+        import web_interface
+        self.wi = web_interface
+        web_interface._last_manual_feed = None
+        self.client = web_interface.app.test_client()
+        self.json = {'Accept': 'application/json'}
+        with open('feeding_schedules.txt', 'w') as f:
+            f.write("08:00,medium\n17:00,medium\n20:00,small\n")  # 1.25 cups → allowance 0.75 (floor)
+
+    def _log_manual(self, portion, n):
+        stamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with open('feeding_log.txt', 'a') as f:
+            for _ in range(n):
+                f.write(f"{stamp},100 - INFO - Feeding completed in 0.31s ({portion} portion, manual)\n")
+
+    def test_allowance_is_half_schedule_with_floor(self):
+        self.assertEqual(self.wi.manual_allowance_cups(), 0.75)
+        with open('feeding_schedules.txt', 'w') as f:
+            f.write("06:00,large\n12:00,large\n18:00,large\n")  # 2.25 cups
+        self.assertEqual(self.wi.manual_allowance_cups(), 1.125)
+
+    def test_feed_within_allowance_dispenses(self):
+        with patch('web_interface.feed_pet', return_value=True) as mock_feed:
+            resp = self.client.post('/feed', data={'portion': 'small'}, headers=self.json)
+        self.assertEqual(resp.status_code, 200)
+        mock_feed.assert_called_once()
+
+    def test_feed_over_allowance_refused_without_dispensing(self):
+        self._log_manual('medium', 1)  # 0.5 used; a medium would make 1.0 > 0.75
+        with patch('web_interface.feed_pet') as mock_feed:
+            resp = self.client.post('/feed', data={'portion': 'medium'}, headers=self.json)
+        self.assertEqual(resp.status_code, 429)
+        self.assertIn('0.5 of 0.75', resp.get_json()['message'])
+        mock_feed.assert_not_called()
+
+    def test_scheduled_feeds_do_not_count_toward_manual_cap(self):
+        stamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with open('feeding_log.txt', 'w') as f:
+            f.write(f"{stamp},1 - INFO - Feeding completed in 0.3s (large portion, scheduled)\n" * 3)
+        with patch('web_interface.feed_pet', return_value=True):
+            resp = self.client.post('/feed', data={'portion': 'small'}, headers=self.json)
+        self.assertEqual(resp.status_code, 200)
+
+    def test_second_feed_within_cooldown_refused(self):
+        with patch('web_interface.feed_pet', return_value=True) as mock_feed:
+            self.client.post('/feed', data={'portion': 'small'}, headers=self.json)
+            resp = self.client.post('/feed', data={'portion': 'small'}, headers=self.json)
+        self.assertEqual(resp.status_code, 429)
+        self.assertEqual(mock_feed.call_count, 1)
+
+    def test_failed_feed_does_not_start_cooldown(self):
+        with patch('web_interface.feed_pet', side_effect=[False, True]) as mock_feed:
+            self.client.post('/feed', data={'portion': 'small'}, headers=self.json)
+            resp = self.client.post('/feed', data={'portion': 'small'}, headers=self.json)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(mock_feed.call_count, 2)
+
+    def test_cross_origin_post_refused(self):
+        with patch('web_interface.feed_pet') as mock_feed:
+            resp = self.client.post('/feed', data={'portion': 'small'},
+                                    headers={**self.json, 'Origin': 'https://evil.example'})
+        self.assertEqual(resp.status_code, 403)
+        mock_feed.assert_not_called()
+
+    def test_same_origin_and_originless_posts_allowed(self):
+        with patch('web_interface.feed_pet', return_value=True):
+            resp = self.client.post('/feed', data={'portion': 'small'},
+                                    headers={**self.json, 'Origin': 'http://localhost'})
+        self.assertEqual(resp.status_code, 200)
+        resp = self.client.post('/add', data={'feeding_time': '23:59'}, headers=self.json)
+        self.assertEqual(resp.status_code, 200)
+
+
+class TestWatchdog(TempCwd):
+    """ops/mini-sync/watchdog.py: outside-in alerts from the synced store."""
+
+    @classmethod
+    def setUpClass(cls):
+        import importlib.util
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ops', 'mini-sync', 'watchdog.py')
+        spec = importlib.util.spec_from_file_location('watchdog', path)
+        cls.wd = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.wd)
+
+    NOW = datetime(2026, 9, 29, 14, 30)
+
+    def _store(self, schedule_date='2026-09-29', times=('06:00', '14:00'), events=()):
+        with open('todays_schedule.json', 'w') as f:
+            json.dump({'date': schedule_date, 'schedule': [
+                {'base_time': t, 'actual_time': t, 'portion': 'small'} for t in times]}, f)
+        with open('feeding_events.jsonl', 'w') as f:
+            for e in events:
+                f.write(json.dumps(e) + '\n')
+
+    @staticmethod
+    def _dispense(time_str, **extra):
+        return {'ts': f'2026-09-29T{time_str}:01', 'event': 'dispense', 'scheduled_for': time_str, **extra}
+
+    def _keys(self, now=None, contact_ago=5):
+        alerts, _ = self.wd.check('.', now or self.NOW, (now or self.NOW) - timedelta(minutes=contact_ago))
+        return [k for k, _, _ in alerts]
+
+    def test_all_fed_is_quiet(self):
+        self._store(events=[self._dispense('06:00'), self._dispense('14:00')])
+        self.assertEqual(self._keys(), [])
+
+    def test_missed_feed_after_grace_alerts(self):
+        self._store(events=[self._dispense('06:00')])
+        self.assertEqual(self._keys(), ['missed:2026-09-29:14:00'])
+
+    def test_missed_feed_within_grace_is_quiet(self):
+        self._store(events=[self._dispense('06:00')])
+        self.assertEqual(self._keys(now=datetime(2026, 9, 29, 14, 10)), [])
+
+    def test_failure_event_is_not_double_paged(self):
+        self._store(events=[self._dispense('06:00'),
+                            {'ts': '2026-09-29T14:00:01', 'event': 'failure', 'scheduled_for': '14:00'}])
+        self.assertEqual(self._keys(), [])
+
+    def test_unrolled_schedule_alerts_after_grace(self):
+        self._store(schedule_date='2026-09-28')
+        self.assertEqual(self._keys(), ['stale:2026-09-29'])
+        self.assertEqual(self._keys(now=datetime(2026, 9, 29, 0, 5)), [])
+
+    def test_sim_events_from_pi_alert(self):
+        self._store(events=[self._dispense('06:00', sim=True), self._dispense('14:00', sim=True)])
+        self.assertEqual(self._keys(), ['sim:2026-09-29'])
+
+    def test_no_contact_is_unreachable(self):
+        alerts, reachable = self.wd.check('.', self.NOW, None)
+        self.assertFalse(reachable)
+        self.assertEqual([k for k, _, _ in alerts], ['unreachable'])
+
+    def test_stale_data_skips_schedule_checks(self):
+        self._store(events=[])  # everything "missed", but data is 30 min old
+        self.assertEqual(self._keys(contact_ago=30), [])
+
+    def test_alerts_once_then_recovery_notice(self):
+        with open('last_contact', 'w') as f:
+            f.write(str(int((datetime.now() - timedelta(hours=2)).timestamp())))
+        with patch.object(self.wd, 'send', return_value=True) as mock_send, \
+             patch.object(self.wd.sys, 'argv', ['watchdog.py', '.']):
+            self.wd.main()
+            self.wd.main()
+            self.assertEqual(mock_send.call_count, 1)
+            with open('last_contact', 'w') as f:
+                f.write(str(int(datetime.now().timestamp())))
+            self._store(schedule_date=date.today().isoformat(), times=())
+            self.wd.main()
+            self.assertEqual(mock_send.call_args[0][0], "Feeder is back online.")
+
+    def test_unsent_alert_is_retried(self):
+        with patch.object(self.wd, 'send', return_value=False) as mock_send, \
+             patch.object(self.wd.sys, 'argv', ['watchdog.py', '.']):
+            self.wd.main()
+            self.wd.main()
+        self.assertEqual(mock_send.call_count, 2)
+
+
+class TestGpioLoading(unittest.TestCase):
+    def test_off_pi_missing_gpio_simulates(self):
+        import DRV8825
+        _, sim = DRV8825.load_gpio(force_simulate=False, is_pi=False)
+        self.assertTrue(sim)  # RPi.GPIO isn't installed on the dev box
+
+    def test_on_pi_missing_gpio_refuses_to_simulate(self):
+        import DRV8825
+        with self.assertRaises(ImportError):
+            DRV8825.load_gpio(force_simulate=False, is_pi=True)
+
+    def test_forced_simulation_wins_on_pi(self):
+        import DRV8825
+        _, sim = DRV8825.load_gpio(force_simulate=True, is_pi=True)
+        self.assertTrue(sim)

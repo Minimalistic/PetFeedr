@@ -4,22 +4,46 @@ import logging
 
 log = logging.getLogger('petfeedr')
 
-# Determine if we're running in simulation mode
-# Auto-detect: if RPi.GPIO isn't available, we're not on a Pi
-# Manual override: set PETFEEDR_SIMULATE=true to force simulation
-SIMULATION_MODE = os.environ.get('PETFEEDR_SIMULATE', 'false').lower() == 'true'
+PI_MODEL_FILE = '/proc/device-tree/model'
 
-if not SIMULATION_MODE:
+
+def on_raspberry_pi():
     try:
-        import RPi.GPIO as GPIO
+        with open(PI_MODEL_FILE, 'rb') as f:
+            return b'Raspberry Pi' in f.read()
+    except OSError:
+        return False
+
+
+def load_gpio(force_simulate, is_pi):
+    """Return (GPIO module, simulation_mode).
+
+    Off a Pi, a missing RPi.GPIO means simulation — the dev-on-Mac path.
+    ON a Pi it means a broken install (fresh SD image, failed pip), and
+    silently simulating there would log "Feeding completed" for meals the
+    motor never dispensed, with notifications suppressed. So a Pi fails
+    loudly: systemd restart-loops, no dispenses land, the mini's watchdog pages.
+    """
+    if force_simulate:
+        import mock_gpio
+        log.info("🔧 PETFEEDR_SIMULATE=true - running in SIMULATION mode")
+        return mock_gpio, True
+    try:
+        import RPi.GPIO as gpio
+        return gpio, False
     except ImportError:
-        # RPi.GPIO not available - automatically switch to simulation
-        import mock_gpio as GPIO
-        SIMULATION_MODE = True
+        if is_pi:
+            log.error("RPi.GPIO failed to import on a Raspberry Pi — refusing to "
+                      "simulate. Reinstall deps (pip install -r requirements-pi.txt).")
+            raise
+        import mock_gpio
         log.info("🔧 RPi.GPIO not found - running in SIMULATION mode")
-else:
-    import mock_gpio as GPIO
-    log.info("🔧 PETFEEDR_SIMULATE=true - running in SIMULATION mode")
+        return mock_gpio, True
+
+
+# Manual override: PETFEEDR_SIMULATE=true forces simulation even on a Pi
+GPIO, SIMULATION_MODE = load_gpio(
+    os.environ.get('PETFEEDR_SIMULATE', 'false').lower() == 'true', on_raspberry_pi())
 
 MotorDir = [
     'forward',
