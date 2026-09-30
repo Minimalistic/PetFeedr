@@ -85,7 +85,11 @@ git log --oneline "$RANGE"
 
 BRANCH="${1:-$(git log -1 --format=%s | sed -E 's/^[a-z]+(\([^)]*\))?: *//' \
     | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | cut -c1-40 | sed 's/-*$//')}"
-git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1 && fail "Branch $BRANCH already exists on origin"
+# Re-running after a partial ship is fine if the branch is exactly this HEAD
+REMOTE_SHA=$(git ls-remote --heads origin "$BRANCH" | cut -f1)
+if [ -n "$REMOTE_SHA" ] && [ "$REMOTE_SHA" != "$(git rev-parse HEAD)" ]; then
+    fail "Branch $BRANCH already exists on origin at a different commit"
+fi
 
 say "Running tests"
 python3 -m unittest -q 2>&1 | tail -3
@@ -96,8 +100,24 @@ PLIST_CHANGED=$(git diff --name-only "$RANGE" -- ops/mini-sync/city.marsh.petfee
 
 # ---- Ship -------------------------------------------------------------------
 say "Pushing $BRANCH and opening the PR"
-git push -q origin "HEAD:refs/heads/$BRANCH"
-gh pr create --base main --head "$BRANCH" --fill-verbose
+[ -n "$REMOTE_SHA" ] || git push -q origin "HEAD:refs/heads/$BRANCH"
+# Title/body from the commits here — gh's --fill needs a local branch ref,
+# and ship.sh pushes HEAD without creating one
+if [ "$(git rev-list --count "$RANGE")" -eq 1 ]; then
+    TITLE=$(git log -1 --format=%s)
+    BODY=$(git log -1 --format=%b)
+else
+    TITLE="Ship: $(git log -1 --format=%s) (+$(( $(git rev-list --count "$RANGE") - 1 )) more)"
+    BODY=$(git log --reverse --format='- %s' "$RANGE")
+fi
+BODY="$BODY
+
+Local test suite passed (no CI in this repo). Shipped with ship.sh."
+if gh pr view "$BRANCH" --json state -q .state 2>/dev/null | grep -q OPEN; then
+    echo "  PR already open"
+else
+    gh pr create --base main --head "$BRANCH" --title "$TITLE" --body "$BODY"
+fi
 gh pr merge "$BRANCH" --merge --delete-branch
 git pull -q --ff-only origin main
 git branch -q -u origin/main
