@@ -93,11 +93,16 @@ sudo systemctl start petfeedr.service
 ## Deployment
 
 ```bash
-./deploy.sh
+./ship.sh            # "ship it": tests → PR → merge → deploy.sh → prod smoke
+./ship.sh --check    # preflight + smoke against the running Pi; changes nothing
+./deploy.sh          # deploy only (no git), e.g. redeploying the current main
 ```
-Backs up current Pi install, syncs files, updates deps, restarts service. Preserves schedule/log files.
+ship.sh refuses a dirty tree, failing tests, or a feed due within 3 min, and
+fails the smoke on an inactive service, non-200 dashboard, simulation mode, or
+any traceback since the restart. deploy.sh backs up the Pi install, syncs
+files, updates deps, restarts the service; schedule/log/state files are preserved.
 
-Target: `pi@petfeedr.local` (override with `PI_HOST` env var).
+Target: `jason@petfeedr` over Tailscale (override with `PI_HOST`).
 
 Live: `http://petfeedr.local:5000` (local network only — no auth).
 
