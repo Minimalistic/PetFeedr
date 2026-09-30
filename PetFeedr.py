@@ -9,13 +9,17 @@ from datetime import date
 from threading import Thread
 
 from feeder_core import (STATE_LOCK, ensure_today, generate_todays_schedule,
-                         resync_today, catch_up_missed, log, setup_logging)
+                         resync_today, catch_up_missed, wait_for_clock_sync,
+                         log, setup_logging)
 from DRV8825 import SIMULATION_MODE
 import web_interface
 
 
 def run():
     """Main run loop - loads schedules and runs them."""
+    # Before anything reads the clock: "today" and every slot time depend on it
+    wait_for_clock_sync()
+
     log.info("Loading today's feeding schedule.")
 
     try:

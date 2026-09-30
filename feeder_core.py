@@ -12,9 +12,11 @@ import json
 import schedule
 import logging
 import threading
+import time
 from logging.handlers import TimedRotatingFileHandler
 from datetime import datetime, timedelta, date
 from servo_controller import trigger_servo, DEFAULT_PORTION
+from DRV8825 import on_raspberry_pi
 from feeding_stats import (PORTION_CUPS, COMPLETED_RE, parse_weekly_stats,
                            calculate_consumption_rate, read_all_log_lines)
 import hopper
@@ -206,6 +208,57 @@ def generate_todays_schedule():
         return todays_schedule
 
 
+def scheduled_feed(portion, base_time, scheduled_for):
+    """Job body for a scheduled slot — dispenses at most once per slot per day.
+
+    The Pi has no battery clock: after a power cut it boots on a saved time
+    that can be half an hour stale, then jumps forward when NTP syncs. A
+    slot fed just before the outage then looks like it's still ahead, gets
+    registered again, and would fire a second time. Checking the record
+    first makes the job safe against that and any other re-registration.
+    """
+    with STATE_LOCK:
+        today = date.today()
+        status, _ = slot_outcome(scheduled_for, today, *todays_records(today))
+        if status:
+            log.warning(f"Skipping {scheduled_for} feeding — already recorded as {status} today "
+                        "(clock jump or restart)")
+            return False
+        return feed_pet(portion=portion, base_time=base_time, scheduled_for=scheduled_for)
+
+
+# systemd-timesyncd creates this on its first sync after boot (/run is tmpfs)
+CLOCK_SYNC_FLAG = '/run/systemd/timesync/synchronized'
+CLOCK_WAIT_S = 600
+
+
+def wait_for_clock_sync(timeout_s=CLOCK_WAIT_S, flag=CLOCK_SYNC_FLAG, is_pi=None,
+                        sleep=time.sleep, monotonic=time.monotonic):
+    """Hold the scheduler until the system clock is NTP-synced. Returns True
+    once synced (or off a Pi, where it doesn't apply), False on timeout.
+
+    Scheduling on the stale boot-time clock is what sets up a double feed,
+    so wait — but not forever: with no network the pet still has to eat, so
+    after timeout_s the feeder runs on the saved time and says so loudly.
+    """
+    if is_pi is None:
+        is_pi = on_raspberry_pi()
+    if not is_pi or os.path.exists(flag):
+        return True
+    log.warning(f"System clock isn't NTP-synced yet (no battery clock on this Pi) — "
+                f"holding the scheduler for up to {timeout_s // 60} min")
+    started = monotonic()
+    while monotonic() - started < timeout_s:
+        sleep(5)
+        if os.path.exists(flag):
+            log.info(f"Clock synced after {int(monotonic() - started)}s — starting the scheduler")
+            return True
+    log.error("Clock still not synced — scheduling on the saved time, which may be off")
+    notify.send("Feeder started without a synced clock (no network?). Feed times may be off "
+                "until it syncs.", priority=1)
+    return False
+
+
 def resync_today():
     """Rebuild the job registry from todays_schedule.json.
 
@@ -220,7 +273,7 @@ def resync_today():
         schedule.clear()
         for entry in load_todays_schedule() or []:
             schedule.every().day.at(entry['actual_time']).do(
-                feed_pet, portion=entry['portion'],
+                scheduled_feed, portion=entry['portion'],
                 base_time=entry['base_time'], scheduled_for=entry['actual_time'])
 
 
