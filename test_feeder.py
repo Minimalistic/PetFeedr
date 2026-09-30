@@ -672,6 +672,32 @@ class TestScheduleStore(TempCwd):
         import schedule_store
         self.assertEqual(schedule_store.read_entries(), [])
 
+    def test_failed_write_leaves_original_and_no_debris(self):
+        # The power-cut case: if the swap never happens, the old file survives intact
+        import atomicfile
+        with open('state.txt', 'w') as f:
+            f.write("original")
+        with patch('atomicfile.os.replace', side_effect=OSError("power cut")):
+            with self.assertRaises(OSError):
+                atomicfile.write_atomic('state.txt', "new")
+        with open('state.txt') as f:
+            self.assertEqual(f.read(), "original")
+        self.assertEqual(os.listdir('.'), ['state.txt'])
+
+    def test_missing_schedule_file_pages(self):
+        with patch('feeder_core.notify.send') as mock_send:
+            self.assertEqual(feeder_core.generate_todays_schedule(), [])
+        self.assertIn("No feedings", mock_send.call_args[0][0])
+        self.assertTrue(os.path.isfile('feeding_schedules.txt'))
+
+    def test_nonempty_schedule_does_not_page(self):
+        with open('feeding_schedules.txt', 'w') as f:
+            f.write("08:00,small,fixed\n")
+        with patch('feeder_core.notify.send') as mock_send:
+            feeder_core.generate_todays_schedule()
+        mock_send.assert_not_called()
+
+
 class TestScheduleRoutes(TempCwd):
     def setUp(self):
         super().setUp()

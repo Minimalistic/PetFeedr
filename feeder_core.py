@@ -19,6 +19,7 @@ import hopper
 import notify
 import events
 import schedule_store
+from atomicfile import write_atomic
 
 # One lock for everything that touches the schedule files, the job registry,
 # or the motor. The `schedule` library has no thread safety of its own, and
@@ -159,11 +160,14 @@ def generate_todays_schedule():
     with STATE_LOCK:
         entries = schedule_store.read_entries()
         if not entries:
+            # A missing or empty schedule means nothing gets fed today. That's
+            # never the steady state (a dead SD write, a bad restore), so page.
             if not schedule_store.exists():
                 open(schedule_store.SCHEDULES_FILE, 'w').close()
                 log.warning(f"{schedule_store.SCHEDULES_FILE} not found. An empty file has been created.")
             else:
                 log.warning(f"{schedule_store.SCHEDULES_FILE} is empty. Starting with an empty schedule.")
+            notify.send("No feedings are scheduled today — check the feeder's schedule.", priority=1)
             save_todays_schedule([])
             return []
 
@@ -235,8 +239,7 @@ def save_todays_schedule(schedule_data):
         'schedule': schedule_data
     }
     try:
-        with open(TODAYS_SCHEDULE_FILE, 'w') as f:
-            json.dump(data, f, indent=2)
+        write_atomic(TODAYS_SCHEDULE_FILE, json.dumps(data, indent=2))
     except Exception as e:
         log.error(f"Error saving today's schedule: {e}")
 

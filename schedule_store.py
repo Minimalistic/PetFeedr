@@ -10,6 +10,7 @@ Callers hold feeder_core.STATE_LOCK for read-modify-write sequences.
 import logging
 import os
 
+from atomicfile import write_atomic
 from servo_controller import PORTION_SIZES, DEFAULT_PORTION
 
 log = logging.getLogger('petfeedr')
@@ -60,9 +61,8 @@ def read_entries():
 
 
 def write_entries(entries):
-    with open(SCHEDULES_FILE, 'w') as f:
-        f.write(''.join(
-            format_line(e['time'], e['portion'], e['is_fixed']) + '\n' for e in entries))
+    write_atomic(SCHEDULES_FILE, ''.join(
+        format_line(e['time'], e['portion'], e['is_fixed']) + '\n' for e in entries))
 
 
 def exists():
