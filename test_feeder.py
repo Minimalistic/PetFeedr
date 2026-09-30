@@ -14,7 +14,8 @@ import schedule
 
 import feeder_core
 import feeding_stats
-from feeder_core import parse_schedule_line, apply_random_offset
+from feeder_core import apply_random_offset
+from schedule_store import parse_line as parse_schedule_line
 
 
 class TestParseScheduleLine(unittest.TestCase):
@@ -33,10 +34,10 @@ class TestParseScheduleLine(unittest.TestCase):
     def test_whitespace_tolerated(self):
         self.assertEqual(parse_schedule_line(" 08:00 , medium , FIXED \n"), ("08:00", "medium", True))
 
-    def test_legacy_fixed_in_portion_slot_not_recognized(self):
-        # Quirk pinned: "HH:MM,fixed" is NOT treated as fixed by the scheduler
-        # (the web UI displays it as fixed — known inconsistency).
-        self.assertEqual(parse_schedule_line("08:00,fixed"), ("08:00", "small", False))
+    def test_legacy_fixed_in_portion_slot_is_fixed(self):
+        # One parser now: the scheduler honors "HH:MM,fixed" the way the UI
+        # always displayed it (they used to disagree).
+        self.assertEqual(parse_schedule_line("08:00,fixed"), ("08:00", "small", True))
 
 
 class TestApplyRandomOffset(unittest.TestCase):
@@ -654,3 +655,68 @@ class TestRenderNote(TempCwd):
         text = self.rn.render([], [], {}, now=datetime(2026, 9, 10, 17))
         self.assertIn('learning capacity', text)
         self.assertIn('No feedings recorded yet', text)
+
+
+class TestScheduleStore(TempCwd):
+    """feeding_schedules.txt round-trips and crash-safe writes."""
+
+    def test_round_trip_normalizes_legacy_lines(self):
+        import schedule_store
+        with open('feeding_schedules.txt', 'w') as f:
+            f.write("08:00,fixed\n\n 12:00 , large \n")
+        schedule_store.write_entries(schedule_store.read_entries())
+        with open('feeding_schedules.txt') as f:
+            self.assertEqual(f.read(), "08:00,small,fixed\n12:00,large\n")
+
+    def test_missing_file_reads_empty(self):
+        import schedule_store
+        self.assertEqual(schedule_store.read_entries(), [])
+
+class TestScheduleRoutes(TempCwd):
+    def setUp(self):
+        super().setUp()
+        schedule.clear()
+        import web_interface
+        self.client = web_interface.app.test_client()
+        self.json = {'Accept': 'application/json'}
+
+    def tearDown(self):
+        schedule.clear()
+        super().tearDown()
+
+    def _file(self):
+        with open('feeding_schedules.txt') as f:
+            return f.read()
+
+    def test_add_rejects_malformed_time_without_writing(self):
+        for bad in ['7:5', '25:00', 'noon', '']:
+            resp = self.client.post('/add', data={'feeding_time': bad}, headers=self.json)
+            self.assertEqual(resp.status_code, 400, bad)
+        self.assertFalse(os.path.exists('feeding_schedules.txt'))
+
+    def test_add_then_duplicate_conflicts(self):
+        resp = self.client.post('/add', data={'feeding_time': '23:58', 'portion': 'large'},
+                                headers=self.json)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(self._file(), "23:58,large,fixed\n")
+        resp = self.client.post('/add', data={'feeding_time': '23:58'}, headers=self.json)
+        self.assertEqual(resp.status_code, 409)
+
+    def test_toggle_legacy_fixed_line_randomizes_it(self):
+        with open('feeding_schedules.txt', 'w') as f:
+            f.write("08:00,fixed\n")
+        self.client.post('/toggle_fixed', data={'base_time': '08:00'}, headers=self.json)
+        self.assertEqual(self._file(), "08:00,small\n")
+
+    def test_toggle_unknown_time_is_404(self):
+        resp = self.client.post('/toggle_fixed', data={'base_time': '09:00'}, headers=self.json)
+        self.assertEqual(resp.status_code, 404)
+
+    def test_update_portion_and_delete(self):
+        with open('feeding_schedules.txt', 'w') as f:
+            f.write("08:00,small,fixed\n12:00,small\n")
+        self.client.post('/update_portion', data={'base_time': '08:00', 'portion': 'large'},
+                         headers=self.json)
+        self.client.post('/delete', data={'base_time': '12:00'}, headers=self.json)
+        self.assertEqual(self._file(), "08:00,large,fixed\n")
+

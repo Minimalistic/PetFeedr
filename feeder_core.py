@@ -13,11 +13,12 @@ import logging
 import threading
 from logging.handlers import TimedRotatingFileHandler
 from datetime import datetime, timedelta, date
-from servo_controller import trigger_servo, PORTION_SIZES, DEFAULT_PORTION
+from servo_controller import trigger_servo, DEFAULT_PORTION
 from feeding_stats import PORTION_CUPS, parse_weekly_stats, calculate_consumption_rate
 import hopper
 import notify
 import events
+import schedule_store
 
 # One lock for everything that touches the schedule files, the job registry,
 # or the motor. The `schedule` library has no thread safety of its own, and
@@ -111,29 +112,6 @@ def _track_hopper(cups):
         return None
 
 
-def parse_schedule_line(line):
-    """Parse a schedule line into components.
-
-    Format: "HH:MM,portion[,fixed]"
-    Returns: (time_str, portion, is_fixed)
-    """
-    parts = line.strip().split(',')
-    time_str = parts[0].strip()
-
-    portion = DEFAULT_PORTION
-    is_fixed = False
-
-    if len(parts) > 1:
-        portion = parts[1].strip()
-        if portion not in PORTION_SIZES:
-            portion = DEFAULT_PORTION
-
-    if len(parts) > 2 and parts[2].strip().lower() == 'fixed':
-        is_fixed = True
-
-    return time_str, portion, is_fixed
-
-
 def apply_random_offset(time_str, range_minutes, all_times):
     """Apply a random offset to a time, avoiding conflicts with other times.
 
@@ -179,29 +157,21 @@ def generate_todays_schedule():
     range_minutes = 30
 
     with STATE_LOCK:
-        if not os.path.isfile('feeding_schedules.txt'):
-            open('feeding_schedules.txt', 'w').close()
-            log.info("feeding_schedules.txt not found. An empty file has been created.")
+        entries = schedule_store.read_entries()
+        if not entries:
+            if not schedule_store.exists():
+                open(schedule_store.SCHEDULES_FILE, 'w').close()
+                log.warning(f"{schedule_store.SCHEDULES_FILE} not found. An empty file has been created.")
+            else:
+                log.warning(f"{schedule_store.SCHEDULES_FILE} is empty. Starting with an empty schedule.")
             save_todays_schedule([])
             return []
 
         todays_schedule = []
         scheduled_times = []  # Track times to avoid conflicts
 
-        with open('feeding_schedules.txt', 'r') as file:
-            lines = file.readlines()
-
-        if len(lines) == 0:
-            log.warning("feeding_schedules.txt is empty. Starting with an empty schedule.")
-            save_todays_schedule([])
-            return []
-
-        for line in lines:
-            line = line.strip()
-            if not line:
-                continue
-
-            time_str, portion, is_fixed = parse_schedule_line(line)
+        for entry in entries:
+            time_str, portion, is_fixed = entry['time'], entry['portion'], entry['is_fixed']
 
             # Apply randomization if not fixed
             if not is_fixed:
