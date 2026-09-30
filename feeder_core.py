@@ -102,7 +102,7 @@ def _track_hopper(cups):
     Tracking must never break a feeding that already succeeded."""
     try:
         state = hopper.record_dispense(cups)
-        rate = calculate_consumption_rate(parse_weekly_stats())
+        rate = calculate_consumption_rate(parse_weekly_stats(), cups_per_lb=hopper.cups_per_lb(state))
         message = hopper.check_low(rate['daily_cups'] if rate else None)
         if message:
             log.info(message)

@@ -746,3 +746,11 @@ class TestScheduleRoutes(TempCwd):
         self.client.post('/delete', data={'base_time': '12:00'}, headers=self.json)
         self.assertEqual(self._file(), "08:00,large,fixed\n")
 
+
+class TestLearnedCupsPerLb(unittest.TestCase):
+    def test_consumption_uses_learned_ratio(self):
+        week = [{'total_cups': 2.0, 'total_feedings': 4}]
+        self.assertEqual(feeding_stats.calculate_consumption_rate(week)['daily_lbs'], 0.5)
+        self.assertEqual(feeding_stats.calculate_consumption_rate(
+            week, cups_per_lb=5.0)['daily_lbs'], 0.4)
+

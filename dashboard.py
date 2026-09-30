@@ -126,7 +126,8 @@ def index_context():
 
     weekly_stats = parse_weekly_stats()
     max_daily_cups = max(max((d['total_cups'] for d in weekly_stats), default=0.5), 0.5)
-    consumption = calculate_consumption_rate(weekly_stats)
+    consumption = calculate_consumption_rate(
+        weekly_stats, cups_per_lb=hopper.cups_per_lb(hopper.load_state()))
 
     return {
         'schedules': schedules,

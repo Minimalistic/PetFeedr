@@ -146,8 +146,12 @@ def build_week_summary(weekly_stats):
     return f"{manual_label} this week"
 
 
-def calculate_consumption_rate(weekly_stats):
-    """Calculate consumption rate from weekly data."""
+DEFAULT_CUPS_PER_LB = 4.0  # ~4 oz dry kibble per cup, until a weighed refill teaches the real ratio
+
+
+def calculate_consumption_rate(weekly_stats, cups_per_lb=None):
+    """Calculate consumption rate from weekly data. cups_per_lb: the hopper's
+    learned ratio (nominal cups dispensed per lb), None for the default."""
     total_cups = sum(d['total_cups'] for d in weekly_stats)
     days_with_data = sum(1 for d in weekly_stats if d['total_feedings'] > 0)
     if days_with_data == 0:
@@ -155,7 +159,7 @@ def calculate_consumption_rate(weekly_stats):
     daily_avg = total_cups / days_with_data
     weekly_avg = daily_avg * 7
     monthly_avg = daily_avg * 30
-    lbs_per_cup = 0.25  # ~4 oz dry kibble per cup, 16 oz per lb
+    lbs_per_cup = 1 / (cups_per_lb or DEFAULT_CUPS_PER_LB)
     return {
         'daily_cups': round(daily_avg, 2),
         'daily_lbs': round(daily_avg * lbs_per_cup, 2),
