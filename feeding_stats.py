@@ -204,6 +204,83 @@ def day_feedings(date_str, lines=None):
     return feedings, total_cups
 
 
+def _day_pct(hhmm):
+    """'HH:MM' (or 'HH:MM:SS') → position along a 24h axis, 0–100."""
+    h, m = hhmm.split(':')[:2]
+    return round((int(h) * 60 + int(m)) / 1440 * 100, 2)
+
+
+def _clock_12h(hhmm):
+    h, m = hhmm.split(':')[:2]
+    return f"{int(h) % 12 or 12}:{m} {'AM' if int(h) < 12 else 'PM'}"
+
+
+def rhythm_week(events, today, schedule_entries, upcoming_times=()):
+    """Seven rows (oldest → today) of feed marks on a 24h axis, from the event journal.
+
+    The daily cup total is near-constant on a fixed schedule, so a bar chart
+    of it is seven identical bars. *When* each feed landed is the signal:
+    on-schedule weeks line up into columns, and anything off — a manual
+    extra, a late catch-up, a miss — breaks the pattern visibly.
+
+    schedule_entries: schedule_store entries, drawn as guide bands (±30 min
+    wide when randomized). upcoming_times: today's not-yet-fed 'HH:MM' slots.
+    Mark kinds: fed, manual, late (has from_pct), missed, failed, upcoming.
+    """
+    start = today - timedelta(days=6)
+    days = {}
+    for i in range(7):
+        d = start + timedelta(days=i)
+        days[d.isoformat()] = {'date': d.isoformat(), 'is_today': d == today,
+                               'day_label': 'Today' if d == today else d.strftime('%a'),
+                               'total_cups': 0.0, 'marks': []}
+
+    for e in events:
+        day = days.get((e.get('ts') or '')[:10])
+        if day is None:
+            continue
+        ts_time = e['ts'][11:16]
+        portion = e.get('portion') or 'small'
+        scheduled_for = e.get('scheduled_for')
+        try:
+            if e.get('event') == 'dispense':
+                day['total_cups'] += e.get('cups') or PORTION_CUPS.get(portion, 0)
+                mark = {'kind': 'manual' if e.get('source') == 'manual' else 'fed',
+                        'pct': _day_pct(ts_time), 'portion': portion,
+                        'label': f"{_clock_12h(ts_time)} · {portion} · {e.get('source') or 'scheduled'}"}
+                if e.get('late_by_min') and scheduled_for:
+                    mark.update(kind='late', from_pct=_day_pct(scheduled_for),
+                                label=f"{_clock_12h(ts_time)} · {portion} · {e['late_by_min']} min late")
+            elif e.get('event') == 'missed' and scheduled_for:
+                mark = {'kind': 'missed', 'pct': _day_pct(scheduled_for), 'portion': portion,
+                        'label': f"{_clock_12h(scheduled_for)} · missed"}
+            elif e.get('event') == 'failure':
+                mark = {'kind': 'failed', 'pct': _day_pct(ts_time), 'portion': portion,
+                        'label': f"{_clock_12h(ts_time)} · dispense failed"}
+            else:
+                continue
+        except ValueError:  # a malformed time must not take the dashboard down
+            continue
+        day['marks'].append(mark)
+
+    today_row = days[today.isoformat()]
+    for t in upcoming_times:
+        today_row['marks'].append({'kind': 'upcoming', 'pct': _day_pct(t), 'portion': None,
+                                   'label': f"{_clock_12h(t)} · upcoming"})
+
+    for day in days.values():
+        day['marks'].sort(key=lambda m: m['pct'])
+        day['total_cups'] = round(day['total_cups'], 2)
+
+    # Randomized slots land anywhere in ±30 min, so their band shows that window
+    guides = []
+    for entry in schedule_entries:
+        half_window = 0 if entry['is_fixed'] else 30 / 1440 * 100
+        guides.append({'pct': _day_pct(entry['time']), 'half_width': round(half_window, 2)})
+
+    return {'days': list(days.values()), 'guides': guides}
+
+
 def on_time_summary(events, today):
     """On-time streak and this week's record from the event journal.
 

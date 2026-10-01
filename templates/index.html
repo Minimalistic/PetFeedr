@@ -276,31 +276,41 @@
                             <span class="streak-chip is-muted">{{ on_time.week_on_time }}/{{ on_time.week_total }} on time</span>
                         {% endif %}
                     </div>
-                    {% if weekly_stats %}
-                        <div class="bar-chart" style="--chart-max: {{ max_daily_cups }};">
-                            {% for day in weekly_stats %}
-                                <div class="bar-column {% if day.is_today %}is-today{% endif %}"
-                                     data-date="{{ day.date }}" data-cups="{{ day.total_cups }}"
-                                     role="button" tabindex="0"
-                                     aria-label="{{ day.day_label }}, {{ day.total_cups }} cups, {{ day.total_feedings }} feedings">
-                                    <div class="bar-stack" style="--col-ratio: {{ (day.total_cups / max_daily_cups) if max_daily_cups > 0 else 0 }};">
-                                        {% if day.large > 0 %}
-                                            <div class="bar-segment bar-large" style="--seg-cups: {{ day.large * 0.75 }};"></div>
-                                        {% endif %}
-                                        {% if day.medium > 0 %}
-                                            <div class="bar-segment bar-medium" style="--seg-cups: {{ day.medium * 0.5 }};"></div>
-                                        {% endif %}
-                                        {% if day.small > 0 %}
-                                            <div class="bar-segment bar-small" style="--seg-cups: {{ day.small * 0.25 }};"></div>
-                                        {% endif %}
+                    {% if rhythm.days | selectattr("marks") | list %}
+                        <div class="rhythm">
+                            <div class="rhythm-axis" aria-hidden="true">
+                                <span style="left: 0%;">12a</span><span style="left: 25%;">6a</span><span style="left: 50%;">12p</span><span style="left: 75%;">6p</span><span style="left: 100%;">12a</span>
+                            </div>
+                            {% for day in rhythm.days %}
+                                {% set fed = day.marks | selectattr('kind', 'in', ['fed', 'manual', 'late']) | list %}
+                                <div class="rhythm-row {% if day.is_today %}is-today{% endif %}"
+                                     data-date="{{ day.date }}" role="button" tabindex="0"
+                                     aria-label="{{ day.day_label }}, {{ day.total_cups | cups }}, {{ fed | length }} feedings{% for m in day.marks if m.kind not in ['fed', 'upcoming'] %}; {{ m.label }}{% endfor %}">
+                                    <span class="rhythm-day">{{ day.day_label }}</span>
+                                    <div class="rhythm-track" aria-hidden="true">
+                                        {% for g in rhythm.guides %}
+                                            <span class="rhythm-guide" style="--pct: {{ g.pct }}; --half: {{ g.half_width }};"></span>
+                                        {% endfor %}
+                                        {% if day.is_today %}<span class="rhythm-now" id="rhythm-now"></span>{% endif %}
+                                        {% for m in day.marks %}
+                                            {% if m.kind == 'late' %}
+                                                <span class="rhythm-late-tail" style="--from: {{ m.from_pct }}; --pct: {{ m.pct }};"></span>
+                                            {% endif %}
+                                            <span class="rhythm-mark mark-{{ m.kind }} {% if m.portion %}size-{{ m.portion }}{% endif %}"
+                                                  style="--pct: {{ m.pct }};" title="{{ m.label }}"></span>
+                                        {% endfor %}
                                     </div>
-                                    {% if day.manual_count > 0 %}
-                                        <div class="bar-manual-dot" title="{{ day.manual_count }} manual">●</div>
-                                    {% endif %}
-                                    <div class="bar-label">{{ day.day_label }}</div>
-                                    <div class="bar-cups">{{ day.total_cups }}</div>
+                                    <span class="rhythm-cups">{{ (day.total_cups | cups).split(' ')[0] }}</span>
                                 </div>
                             {% endfor %}
+                        </div>
+                        <div class="rhythm-legend" aria-hidden="true">
+                            <span><i class="rhythm-mark mark-fed"></i>fed</span>
+                            <span><i class="rhythm-mark mark-manual"></i>manual</span>
+                            <span><i class="rhythm-mark mark-late"></i>late</span>
+                            <span><i class="rhythm-mark mark-missed"></i>missed</span>
+                            <span><i class="rhythm-mark mark-upcoming"></i>upcoming</span>
+                            <span><i class="rhythm-guide-key"></i>scheduled</span>
                         </div>
                         <div class="day-detail-panel" id="day-detail" style="display:none;" aria-live="polite"></div>
                         <div class="stats-footer">
