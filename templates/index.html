@@ -319,16 +319,8 @@
                             {% endif %}
                             {% if consumption %}
                                 <span class="consumption-rate" title="Estimated from last 7 days">
-                                    <span class="rate-toggle" role="radiogroup" aria-label="Consumption period">
-                                        <button class="rate-btn" data-period="daily" role="radio" aria-checked="false" aria-label="Daily">D</button>
-                                        <button class="rate-btn active" data-period="weekly" role="radio" aria-checked="true" aria-label="Weekly">W</button>
-                                        <button class="rate-btn" data-period="monthly" role="radio" aria-checked="false" aria-label="Monthly">M</button>
-                                    </span>
-                                    <span class="rate-value" id="rate-value">{{ consumption.weekly_cups }} cups ({{ consumption.weekly_lbs }} lbs)</span>
+                                    ≈ {{ consumption.daily_cups | cups }}/day · {{ '%g' | format(consumption.monthly_lbs) }} lbs/mo
                                 </span>
-                                <script>
-                                    window._consumption = {{ consumption | tojson }};
-                                </script>
                             {% endif %}
                         </div>
                     {% else %}
