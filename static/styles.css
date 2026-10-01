@@ -1147,7 +1147,12 @@ body {
 .mark-fed      { background: var(--color-primary); }
 .mark-manual   { background: var(--color-surface); border: 2px solid var(--color-accent-dark); }
 .mark-late     { background: var(--color-warning); }
-.mark-upcoming { border: 1.5px dashed var(--color-primary); opacity: 0.6; }
+.mark-upcoming {
+    width: 10px;
+    height: 10px;
+    border: 2px dashed var(--color-primary);
+    background: color-mix(in srgb, var(--color-primary) 18%, var(--color-surface));
+}
 
 .mark-missed,
 .mark-failed {
