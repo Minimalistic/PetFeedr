@@ -8,7 +8,8 @@ from datetime import date, datetime, timedelta
 
 from feeder_core import load_todays_schedule, log, slot_outcome, todays_records
 from feeding_stats import (parse_recent_activity, parse_weekly_stats, build_week_summary,
-                           calculate_consumption_rate, calculate_daily_total, on_time_summary)
+                           calculate_consumption_rate, calculate_daily_total, on_time_summary,
+                           rhythm_week)
 from servo_controller import PORTION_SIZES
 import events
 import hopper
@@ -162,7 +163,7 @@ def index_context():
     timeline_start, timeline_end, timeline_hours = build_timeline(schedules)
 
     weekly_stats = parse_weekly_stats()
-    max_daily_cups = max(max((d['total_cups'] for d in weekly_stats), default=0.5), 0.5)
+    all_events = events.read_all()
     consumption = calculate_consumption_rate(
         weekly_stats, cups_per_lb=hopper.cups_per_lb(hopper.load_state()))
 
@@ -177,10 +178,12 @@ def index_context():
         'timeline_end': timeline_end,
         'timeline_hours': timeline_hours,
         'weekly_stats': weekly_stats,
-        'max_daily_cups': max_daily_cups,
+        'rhythm': rhythm_week(
+            all_events, date.today(), schedule_store.read_entries(),
+            [s['actual_time_24h'] for s in schedules if s['status'] in ('upcoming', 'due')]),
         'week_summary': build_week_summary(weekly_stats),
         'consumption': consumption,
         'hopper': hopper_card(consumption),
         'manual': manual_limit.status(),
-        'on_time': on_time_summary(events.read_all(), date.today()),
+        'on_time': on_time_summary(all_events, date.today()),
     }

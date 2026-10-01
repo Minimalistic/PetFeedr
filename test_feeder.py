@@ -1106,6 +1106,50 @@ class TestOnTimeSummary(unittest.TestCase):
         self.assertEqual((s['streak_days'], s['week_total']), (0, 0))
 
 
+class TestRhythmWeek(unittest.TestCase):
+    TODAY = date(2026, 9, 29)
+    ENTRIES = [{'time': '06:00', 'portion': 'small', 'is_fixed': True},
+               {'time': '18:00', 'portion': 'medium', 'is_fixed': False}]
+
+    @staticmethod
+    def _ev(ts, kind='dispense', **kw):
+        return {'ts': ts, 'event': kind, **kw}
+
+    def test_marks_land_on_the_right_day_and_time(self):
+        evs = [self._ev('2026-09-29T06:00:01', portion='small', cups=0.25, source='scheduled'),
+               self._ev('2026-09-28T12:00:00', portion='large', cups=0.75, source='manual'),
+               self._ev('2026-09-22T06:00:00', portion='small', cups=0.25)]  # 7 days ago: off the chart
+        r = feeding_stats.rhythm_week(evs, self.TODAY, self.ENTRIES)
+        self.assertEqual([d['date'] for d in r['days']][0], '2026-09-23')
+        today, yesterday = r['days'][-1], r['days'][-2]
+        self.assertEqual((today['day_label'], today['total_cups']), ('Today', 0.25))
+        self.assertEqual([(m['kind'], m['pct']) for m in today['marks']], [('fed', 25.0)])
+        self.assertEqual([(m['kind'], m['portion']) for m in yesterday['marks']], [('manual', 'large')])
+        self.assertEqual(sum(d['total_cups'] for d in r['days']), 1.0)
+
+    def test_late_missed_failed_and_upcoming(self):
+        evs = [self._ev('2026-09-29T06:30:00', portion='small', cups=0.25, scheduled_for='06:00', late_by_min=30),
+               self._ev('2026-09-28T07:00:00', 'missed', scheduled_for='06:00'),
+               self._ev('2026-09-27T06:00:00', 'failure', portion='small')]
+        r = feeding_stats.rhythm_week(evs, self.TODAY, self.ENTRIES, upcoming_times=['18:00'])
+        late, upcoming = r['days'][-1]['marks']
+        self.assertEqual((late['kind'], late['from_pct'], late['pct']), ('late', 25.0, 27.08))
+        self.assertEqual(upcoming['kind'], 'upcoming')
+        self.assertEqual(r['days'][-2]['marks'][0]['kind'], 'missed')
+        self.assertEqual(r['days'][-2]['marks'][0]['pct'], 25.0)  # at the slot, not when it was noticed
+        self.assertEqual((r['days'][-3]['marks'][0]['kind'], r['days'][-3]['total_cups']), ('failed', 0))
+
+    def test_guides_widen_for_randomized_slots(self):
+        g = feeding_stats.rhythm_week([], self.TODAY, self.ENTRIES)['guides']
+        self.assertEqual([(x['pct'], x['half_width']) for x in g], [(25.0, 0), (75.0, 2.08)])
+
+    def test_junk_events_are_skipped_not_raised(self):
+        evs = [{'event': 'dispense'}, {'ts': '2026-09-29Tbroken', 'event': 'dispense'},
+               self._ev('2026-09-29T08:00:00', 'refill')]
+        r = feeding_stats.rhythm_week(evs, self.TODAY, [])
+        self.assertTrue(all(not d['marks'] for d in r['days']))
+
+
 class TestDashboardExtras(TempCwd):
     def test_manual_status_marks_portions_that_no_longer_fit(self):
         import manual_limit
@@ -1155,6 +1199,8 @@ class TestDashboardExtras(TempCwd):
         for status in ('status-fed', 'status-late', 'status-failed', 'status-missed', 'status-upcoming'):
             self.assertIn(status, html)
         self.assertIn('+7m', html)
+        for mark in ('mark-fed', 'mark-late', 'mark-failed', 'mark-upcoming', 'rhythm-guide'):
+            self.assertIn(mark, html)
 
 
 class TestScheduledFeedIdempotent(TempCwd):

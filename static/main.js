@@ -100,13 +100,31 @@ function initRateToggle() {
     });
 }
 
-// ===== Bar Chart Day Detail =====
-function initBarChart() {
-    const columns = document.querySelectorAll('.bar-column[data-date]');
+// ===== Weekly Rhythm: now marker + day detail =====
+function initRhythm() {
+    const nowEl = document.getElementById('rhythm-now');
+    if (nowEl) {
+        const placeNow = () => {
+            const d = new Date();
+            nowEl.style.left = `${(d.getHours() * 60 + d.getMinutes()) / 1440 * 100}%`;
+            nowEl.style.display = 'block';
+        };
+        placeNow();
+        setInterval(placeNow, 60000);
+    }
+
+    const columns = document.querySelectorAll('.rhythm-row[data-date]');
     const panel = document.getElementById('day-detail');
     if (!columns.length || !panel) return;
 
     columns.forEach(col => {
+        // role="button" promises keyboard activation, so honor Enter/Space too
+        col.addEventListener('keydown', e => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                col.click();
+            }
+        });
         col.addEventListener('click', async () => {
             const date = col.dataset.date;
             const wasSelected = col.classList.contains('selected');
@@ -159,7 +177,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initThemePicker();
     initCountdown();
     initTimeline();
-    initBarChart();
+    initRhythm();
     initRateToggle();
     initAjaxForms();
     initHoldToFeed();
