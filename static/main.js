@@ -74,32 +74,6 @@ function initTimeline() {
     });
 }
 
-// ===== Consumption Rate Toggle =====
-function initRateToggle() {
-    const btns = document.querySelectorAll('.rate-btn');
-    const value = document.getElementById('rate-value');
-    if (!btns.length || !value || !window._consumption) return;
-
-    const c = window._consumption;
-    const labels = {
-        daily: `${c.daily_cups} cups (${c.daily_lbs} lbs)`,
-        weekly: `${c.weekly_cups} cups (${c.weekly_lbs} lbs)`,
-        monthly: `${c.monthly_cups} cups (${c.monthly_lbs} lbs)`
-    };
-
-    btns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            btns.forEach(b => {
-                b.classList.remove('active');
-                b.setAttribute('aria-checked', 'false');
-            });
-            btn.classList.add('active');
-            btn.setAttribute('aria-checked', 'true');
-            value.textContent = labels[btn.dataset.period];
-        });
-    });
-}
-
 // ===== Weekly Rhythm: now marker + day detail =====
 function initRhythm() {
     const nowEl = document.getElementById('rhythm-now');
@@ -178,7 +152,6 @@ document.addEventListener('DOMContentLoaded', () => {
     initCountdown();
     initTimeline();
     initRhythm();
-    initRateToggle();
     initAjaxForms();
     initHoldToFeed();
 
