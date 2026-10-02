@@ -92,6 +92,9 @@
 
 html {
     font-size: 16px;
+    /* Solid page color on the root: it fills the iOS status-bar strip and
+       overscroll areas, which the body's gradient doesn't reach */
+    background-color: var(--color-bg);
 }
 
 body {
@@ -300,6 +303,11 @@ body {
     margin: 0 auto;
     padding: clamp(0.5rem, 1vw, 0.75rem) clamp(0.75rem, 3vw, 3rem);
     padding-bottom: 0;
+    /* Clear the status bar / Dynamic Island (viewport-fit=cover) and, in
+       landscape, the notch side; env() is 0 everywhere else */
+    padding-top: calc(clamp(0.5rem, 1vw, 0.75rem) + env(safe-area-inset-top));
+    padding-left: max(clamp(0.75rem, 3vw, 3rem), env(safe-area-inset-left));
+    padding-right: max(clamp(0.75rem, 3vw, 3rem), env(safe-area-inset-right));
     min-height: 100vh;
     min-height: 100dvh;
     display: flex;
@@ -422,8 +430,14 @@ body {
     align-items: center;
 }
 
+/* Solid, not faded: at 0.8 opacity this small label dropped below 4.5:1 */
 .next-feeding-card .card-label {
-    color: rgba(255,255,255,0.8);
+    color: white;
+}
+
+/* Dark theme's brighter teal (#00acc1) gave white text 2.7:1; these give 5.4–8.7:1 */
+[data-theme="dark"] .next-feeding-card:not(.all-fed) {
+    background: linear-gradient(135deg, #00767f 0%, #00545c 100%);
 }
 
 .next-feeding-time {
@@ -482,21 +496,27 @@ body {
 
 .randomized-note {
     font-size: 0.8rem;
-    opacity: 0.8;
     font-style: italic;
 }
 
-.next-feeding-none {
-    opacity: 0.7;
-}
-
-/* All-Fed State */
+/* All-Fed State — light keeps the sunny gradient but takes dark text (white
+   on it was 1.8:1); dark deepens the gradient so white text clears 4.9:1 */
 .next-feeding-card.all-fed {
     background: linear-gradient(135deg, #f8b400 0%, #f08080 100%);
+    color: #3b2200;
+}
+
+.next-feeding-card.all-fed .card-label {
+    color: #3b2200;
 }
 
 [data-theme="dark"] .next-feeding-card.all-fed {
-    background: linear-gradient(135deg, #c68a00 0%, #c06060 100%);
+    background: linear-gradient(135deg, #a85d00 0%, #9c3f53 100%);
+    color: white;
+}
+
+[data-theme="dark"] .next-feeding-card.all-fed .card-label {
+    color: white;
 }
 
 .all-fed-content {
@@ -508,6 +528,55 @@ body {
     display: block;
 }
 
+/* ===== Sleeping cat ===== */
+/* The z's drift above the drawing's box, so let them out of it */
+.all-fed-illustration {
+    overflow: visible;
+}
+
+/* Breathing: a slow rise, then a soft squish wider on the exhale. Pivots
+   on the bottom of the head so it settles rather than floats */
+.cat-breathe {
+    transform-box: fill-box;
+    transform-origin: 50% 100%;
+    animation: catBreathe 3.6s ease-in-out infinite;
+}
+
+@keyframes catBreathe {
+    0%, 100% { transform: scale(1, 1); }
+    40%      { transform: scale(0.98, 1.06); }    /* inhale: taller, a touch narrower */
+    70%      { transform: scale(1.045, 0.955); }  /* exhale: the squish */
+}
+
+/* z's float up and to the right, growing and fading, one leaving per
+   exhale (3 z's x 1.2s stagger = the 3.6s breath) */
+.sleep-z {
+    transform-box: fill-box;
+    transform-origin: center;
+    opacity: 0;
+    font-weight: 700;
+    animation: sleepZ 3.6s ease-out infinite;
+}
+
+.sleep-z.z2 { animation-delay: 1.2s; }
+.sleep-z.z3 { animation-delay: 2.4s; }
+
+@keyframes sleepZ {
+    0%   { opacity: 0;    transform: translate(0, 0) scale(0.5) rotate(-10deg); }
+    15%  { opacity: 0.9; }
+    50%  {                transform: translate(14px, -24px) scale(1) rotate(8deg); }
+    100% { opacity: 0;    transform: translate(30px, -50px) scale(1.5) rotate(-6deg); }
+}
+
+/* Reduced motion: still z's in a little rising stack, cat at rest */
+@media (prefers-reduced-motion: reduce) {
+    .cat-breathe { animation: none; }
+    .sleep-z { animation: none; }
+    .sleep-z.z1 { opacity: 0.75; transform: translate(0, 0) scale(0.7); }
+    .sleep-z.z2 { opacity: 0.55; transform: translate(12px, -14px) scale(0.9); }
+    .sleep-z.z3 { opacity: 0.4; transform: translate(24px, -30px) scale(1.1); }
+}
+
 .all-fed-text {
     font-family: var(--font-display);
     font-size: clamp(1.2rem, 3vw, 1.5rem);
@@ -517,7 +586,6 @@ body {
 
 .all-fed-subtext {
     font-size: 0.9rem;
-    opacity: 0.85;
 }
 
 /* Schedule Card */
@@ -763,6 +831,11 @@ body {
     box-shadow: 0 8px 28px rgba(0,131,143,0.5);
 }
 
+/* Same 2.7:1 problem as the Next card in dark mode; #00767f gives "FEED" 5.4:1 */
+[data-theme="dark"] .feed-circle-btn:not(:disabled) {
+    background: #00767f;
+}
+
 .feed-circle-btn:active {
     transform: scale(0.95);
     box-shadow: 0 2px 10px rgba(0,131,143,0.3);
@@ -797,10 +870,6 @@ body {
 @keyframes feedPulse {
     0%, 100% { box-shadow: 0 6px 20px rgba(0,131,143,0.35); }
     50%      { box-shadow: 0 0 30px rgba(39,174,96,0.6); }
-}
-
-.feed-circle-btn.fed {
-    animation: feedPulse 0.8s ease;
 }
 
 /* Segmented Portion Control */
@@ -1159,7 +1228,7 @@ body {
 /* ===== Toasts ===== */
 #toast-container {
     position: fixed;
-    bottom: 1.5rem;
+    bottom: calc(1.5rem + env(safe-area-inset-bottom));
     left: 50%;
     transform: translateX(-50%);
     z-index: 1000;
@@ -1384,16 +1453,9 @@ body {
 
 .feed-hold.holding .hold-ring-fill {
     stroke-dashoffset: 0;
-    transition: stroke-dashoffset 0.7s linear;  /* keep in step with HOLD_MS in main.js */
-}
-
-.feed-hold.fired .hold-ring-fill {
-    stroke: var(--color-success);
-    stroke-dashoffset: 0;
-}
-
-.feed-hold.holding .feed-circle-btn {
-    transform: scale(0.94);
+    /* Ease-in: the fill starts slow and rushes to the end, so a hold builds
+       tension. Duration matches HOLD_MS in static/js/cards/feed.js */
+    transition: stroke-dashoffset 0.7s cubic-bezier(0.55, 0, 0.85, 0.35);
 }
 
 .feed-circle-btn {
@@ -1447,7 +1509,131 @@ body {
     color: var(--color-accent-dark);
 }
 
-/* ===== Kibble Drop ===== */
+/* ===== Feed Sequence =====
+   feed.js walks .feed-hold through: holding → dispensing → done (or failed).
+   Kibble pieces are flown from JS (per-keyframe easing for the arc). */
+
+/* Release: spring back past rest and settle, like a physical button */
+.feed-hold .feed-circle-btn {
+    transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1),
+                box-shadow 0.3s ease, background 0.3s ease;
+}
+
+/* Press: squish in and charge up a glow alongside the ring */
+.feed-hold.holding .feed-circle-btn {
+    transform: scale(0.92);
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--color-accent) 25%, transparent),
+                0 0 34px color-mix(in srgb, var(--color-accent) 55%, transparent);
+    transition: transform 0.7s cubic-bezier(0.55, 0, 0.85, 0.35),
+                box-shadow 0.7s cubic-bezier(0.55, 0, 0.85, 0.35);
+}
+
+/* Dispensing: the ring becomes a sweeping arc while the motor runs */
+.feed-hold.dispensing .hold-ring {
+    animation: ringSweep 0.9s linear infinite;
+}
+
+.feed-hold.dispensing .hold-ring-fill {
+    stroke-dashoffset: 72;
+    transition: stroke-dashoffset 0.3s ease-out;
+}
+
+@keyframes ringSweep {
+    from { transform: rotate(-90deg); }
+    to   { transform: rotate(270deg); }
+}
+
+/* Done: green ring, a springy pop, FEED turns into a drawn checkmark */
+.feed-hold.done .hold-ring-fill {
+    stroke: var(--color-success);
+    stroke-dashoffset: 0;
+}
+
+.feed-hold.done .feed-circle-btn {
+    background: var(--color-success);
+    /* The feed that uses up the last extras disables the button mid-celebration;
+       finish the moment at full strength, then let it grey out */
+    opacity: 1;
+    animation: feedPop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes feedPop {
+    0%   { transform: scale(0.92); }
+    45%  { transform: scale(1.12); }
+    100% { transform: scale(1); }
+}
+
+.feed-circle-label {
+    display: inline-block;
+    transition: opacity 0.2s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.feed-hold.done .feed-circle-label {
+    opacity: 0;
+    transform: scale(0.6);
+}
+
+.feed-check {
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    width: 46%;
+    height: 46%;
+    fill: none;
+    stroke: white;
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    opacity: 0;
+    transition: stroke-dashoffset 0.35s ease-out 0.12s, opacity 0.1s ease 0.1s;
+}
+
+.feed-hold.done .feed-check {
+    stroke-dashoffset: 0;
+    opacity: 1;
+}
+
+/* One expanding ring when the dispense lands */
+.feed-shockwave {
+    position: absolute;
+    inset: 9px;
+    border-radius: 50%;
+    border: 3px solid var(--color-success);
+    pointer-events: none;
+    animation: shockwave 0.7s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+
+@keyframes shockwave {
+    from { transform: scale(1);   opacity: 0.8; }
+    to   { transform: scale(1.9); opacity: 0; }
+}
+
+/* Failed: a short "no" shake while the ring drains */
+.feed-hold.failed .feed-circle-btn {
+    animation: feedShake 0.42s ease;
+}
+
+@keyframes feedShake {
+    0%, 100% { transform: translateX(0); }
+    20%      { transform: translateX(-7px); }
+    40%      { transform: translateX(6px); }
+    60%      { transform: translateX(-4px); }
+    80%      { transform: translateX(2px); }
+}
+
+.hold-hint.is-active {
+    color: var(--color-primary);
+    font-weight: 600;
+}
+
+.hold-hint.is-done {
+    color: var(--color-success);
+    font-weight: 600;
+}
+
+/* Kibble: positioned and flown by feed.js */
 .kibble {
     position: absolute;
     width: var(--size);
@@ -1456,14 +1642,10 @@ body {
     background: radial-gradient(circle at 35% 30%, #dba46b, #9c5f2a 70%);
     pointer-events: none;
     z-index: 3;
-    animation: kibbleFall 0.95s cubic-bezier(0.35, 0.1, 0.6, 1) var(--delay) both;
 }
 
-@keyframes kibbleFall {
-    0%   { opacity: 0; transform: translate(0, 0) rotate(0); }
-    10%  { opacity: 1; }
-    80%  { opacity: 1; }
-    100% { opacity: 0; transform: translate(var(--dx), 110px) rotate(var(--rot)); }
+.kibble.is-dark {
+    background: radial-gradient(circle at 35% 30%, #b97a45, #6e3e17 70%);
 }
 
 /* ===== Streak ===== */

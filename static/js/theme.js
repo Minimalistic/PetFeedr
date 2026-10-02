@@ -7,6 +7,14 @@ const STORAGE_KEY = 'petfeedr-theme';
 const MODES = ['auto', 'light', 'dark'];
 const NAMES = { auto: 'Auto', light: 'Light', dark: 'Dark' };
 const darkQuery = matchMedia('(prefers-color-scheme: dark)');
+// Page background per theme (--color-bg) — the browser chrome / status bar
+// area takes this color so it blends into the page
+const CHROME_COLOR = { light: '#f0f4f4', dark: '#0d2224' };
+
+function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', CHROME_COLOR[theme]);
+}
 
 function storedMode() {
     try { return localStorage.getItem(STORAGE_KEY) || 'auto'; } catch { return 'auto'; }
@@ -28,7 +36,7 @@ function syncButton(btn, mode) {
 
 function setMode(btn, mode) {
     try { localStorage.setItem(STORAGE_KEY, mode); } catch {}
-    document.documentElement.setAttribute('data-theme', effectiveTheme(mode));
+    applyTheme(effectiveTheme(mode));
     syncButton(btn, mode);
 }
 
@@ -39,9 +47,7 @@ export function initTheme() {
 
     // Follow system changes while in Auto
     darkQuery.addEventListener('change', () => {
-        if (storedMode() === 'auto') {
-            document.documentElement.setAttribute('data-theme', effectiveTheme('auto'));
-        }
+        if (storedMode() === 'auto') applyTheme(effectiveTheme('auto'));
     });
 
     let lastToast = null;
