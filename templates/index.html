@@ -33,75 +33,6 @@
                     </div>
                 </section>
 
-                <!-- Add New Feeding -->
-                <section class="sidebar-section">
-                    <h3>Add Feeding Time</h3>
-                    <form action="/add" method="post" class="add-form">
-                        <div class="form-group">
-                            <label for="feeding_time">Time</label>
-                            <input type="time" id="feeding_time" name="feeding_time" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="portion">Portion</label>
-                            <select id="portion" name="portion">
-                                {% for name, (cycles, desc) in portion_sizes.items() %}
-                                    <option value="{{ name }}" {% if name == default_portion %}selected{% endif %}>
-                                        {{ name | capitalize }} ({{ desc }})
-                                    </option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <label class="toggle-switch">
-                            <input type="checkbox" name="randomize" checked>
-                            <span class="toggle-slider"></span>
-                            <span class="toggle-label-text">Randomize time</span>
-                        </label>
-                        <p class="setting-description">Varies feeding time by ±30 min daily</p>
-                        <button type="submit" class="btn btn-primary">Add Feeding</button>
-                    </form>
-                </section>
-                
-                <!-- Edit Schedule -->
-                <section class="sidebar-section">
-                    <h3>Edit Schedule</h3>
-                    {% if schedules %}
-                        <ul class="edit-schedule-list">
-                            {% for sched in schedules %}
-                                <li class="edit-schedule-item">
-                                    <div class="edit-schedule-info">
-                                        <span class="edit-time">{{ sched.actual_time_12h }}</span>
-                                        <span class="edit-portion portion-{{ sched.portion }}">{{ sched.portion }}</span>
-                                        {% if sched.is_fixed %}<span class="fixed-icon">🔒</span>{% endif %}
-                                    </div>
-                                    <div class="edit-schedule-actions">
-                                        <form action="/update_portion" method="post" class="inline-form">
-                                            <input type="hidden" name="base_time" value="{{ sched.base_time_24h }}">
-                                            <select name="portion" class="portion-mini" aria-label="Change portion for {{ sched.actual_time_12h }}">
-                                                {% for name, (cycles, desc) in portion_sizes.items() %}
-                                                    <option value="{{ name }}" {% if sched.portion == name %}selected{% endif %}>{{ name | capitalize }}</option>
-                                                {% endfor %}
-                                            </select>
-                                        </form>
-                                        <form action="/toggle_fixed" method="post" class="inline-form">
-                                            <input type="hidden" name="base_time" value="{{ sched.base_time_24h }}">
-                                            <button type="submit" class="btn-icon" title="{% if sched.is_fixed %}Unlock{% else %}Lock{% endif %} {{ sched.actual_time_12h }} feeding time" aria-label="{% if sched.is_fixed %}Unlock{% else %}Lock{% endif %} {{ sched.actual_time_12h }} feeding time">
-                                                {% if sched.is_fixed %}🔓{% else %}🔒{% endif %}
-                                            </button>
-                                        </form>
-                                        <form action="/delete" method="post" class="inline-form">
-                                            <input type="hidden" name="base_time" value="{{ sched.base_time_24h }}">
-                                            <button type="submit" class="btn-icon btn-delete" title="Delete {{ sched.actual_time_12h }} feeding" aria-label="Delete {{ sched.actual_time_12h }} feeding">✕</button>
-                                        </form>
-                                    </div>
-                                </li>
-                            {% endfor %}
-                        </ul>
-                    {% else %}
-                        <p class="empty-state">No scheduled feedings yet</p>
-                    {% endif %}
-                </section>
-
-
             </div>
         </aside>
 
@@ -153,7 +84,12 @@
 
                 <!-- Today's Schedule (Timeline) -->
                 <section class="card schedule-card">
-                    <div class="card-label">Today's Schedule</div>
+                    <div class="card-label-row">
+                        <div class="card-label">Today's Schedule</div>
+                        {% if schedules %}
+                            <button type="button" class="card-action" onclick="openScheduleSheet()">Edit</button>
+                        {% endif %}
+                    </div>
                     {% if schedules %}
                         <div class="timeline" data-start="{{ timeline_start }}" data-end="{{ timeline_end }}">
                             <div class="timeline-bar">
@@ -209,7 +145,7 @@
                             </svg>
                             <h3>No feedings scheduled yet</h3>
                             <p>Set up your pet's feeding times to get started.</p>
-                            <button class="btn btn-secondary" onclick="openAddFeeding()">Add First Feeding</button>
+                            <button class="btn btn-secondary" onclick="openScheduleSheet({ focusAdd: true })">Add First Feeding</button>
                         </div>
                     {% endif %}
                     <div class="daily-summary">
@@ -402,6 +338,76 @@
             {% endif %}
             </footer>
         </main>
+
+        <!-- Schedule editor: bottom sheet on phones, centered panel on desktop.
+             Native <dialog> + showModal() brings focus trapping, Esc-to-close
+             and the top-layer backdrop for free. -->
+        <dialog class="sheet" id="schedule-sheet" aria-labelledby="schedule-sheet-title">
+            <div class="sheet-grabber" aria-hidden="true"></div>
+            <div class="sheet-header">
+                <h2 id="schedule-sheet-title">Feeding Schedule</h2>
+                <button type="button" class="sheet-close" data-close-sheet aria-label="Close schedule editor">×</button>
+            </div>
+            <div class="sheet-body">
+                {% if schedules %}
+                    <ul class="sched-list">
+                        {% for sched in schedules | sort(attribute='base_time_24h') %}
+                            <li class="sched-row">
+                                <span class="sched-time">{{ sched.base_time_12h }}</span>
+                                <form action="/update_portion" method="post" class="sched-portion">
+                                    <input type="hidden" name="base_time" value="{{ sched.base_time_24h }}">
+                                    <div class="portion-segmented is-compact" role="radiogroup" aria-label="Portion for {{ sched.base_time_12h }}">
+                                        {% for name, (cycles, desc) in portion_sizes.items() %}
+                                            <label class="portion-segment" title="{{ name | capitalize }} ({{ desc }})">
+                                                <input type="radio" name="portion" value="{{ name }}" {% if sched.portion == name %}checked{% endif %}>
+                                                <span class="portion-segment-label portion-{{ name }}">{{ name[0] | upper }}</span>
+                                            </label>
+                                        {% endfor %}
+                                    </div>
+                                </form>
+                                <form action="/toggle_fixed" method="post">
+                                    <input type="hidden" name="base_time" value="{{ sched.base_time_24h }}">
+                                    {# The chip shows the current state; the label says what a tap does #}
+                                    <button type="submit" class="sched-chip {% if sched.is_fixed %}is-fixed{% endif %}"
+                                            aria-label="{% if sched.is_fixed %}Fixed time. Tap to vary {{ sched.base_time_12h }} by 30 minutes{% else %}Varies by 30 minutes. Tap to fix {{ sched.base_time_12h }}{% endif %}">
+                                        {% if sched.is_fixed %}Fixed{% else %}±30m{% endif %}
+                                    </button>
+                                </form>
+                                <form action="/delete" method="post">
+                                    <input type="hidden" name="base_time" value="{{ sched.base_time_24h }}">
+                                    <button type="submit" class="btn-icon btn-delete" aria-label="Delete {{ sched.base_time_12h }} feeding">✕</button>
+                                </form>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                    <p class="setting-description sched-legend">±30m varies the time a little each day; Fixed always feeds on the dot.</p>
+                {% endif %}
+
+                <section class="sheet-add" id="sheet-add">
+                    <h3>Add a feeding</h3>
+                    <form action="/add" method="post" class="add-form">
+                        <div class="add-row">
+                            <label class="sr-only" for="feeding_time">Time</label>
+                            <input type="time" id="feeding_time" name="feeding_time" required>
+                            <div class="portion-segmented is-compact" role="radiogroup" aria-label="Portion">
+                                {% for name, (cycles, desc) in portion_sizes.items() %}
+                                    <label class="portion-segment" title="{{ name | capitalize }} ({{ desc }})">
+                                        <input type="radio" name="portion" value="{{ name }}" {% if name == default_portion %}checked{% endif %}>
+                                        <span class="portion-segment-label portion-{{ name }}">{{ name[0] | upper }}</span>
+                                    </label>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" name="randomize" checked>
+                            <span class="toggle-slider"></span>
+                            <span class="toggle-label-text">Vary by ±30 min daily</span>
+                        </label>
+                        <button type="submit" class="btn btn-primary">Add Feeding</button>
+                    </form>
+                </section>
+            </div>
+        </dialog>
 
         <div id="toast-container" aria-live="polite"></div>
         <script src="{{ url_for('static', filename='main.js') }}"></script>

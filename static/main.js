@@ -154,7 +154,8 @@ document.addEventListener('DOMContentLoaded', () => {
     initRhythm();
     initAjaxForms();
     initHoldToFeed();
-    restoreScroll();
+    initScheduleSheet();
+    restorePageState();
 
     // Register service worker for PWA
     if ('serviceWorker' in navigator) {
@@ -162,16 +163,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// ===== Layout =====
-// Large desktop breakpoint - sidebar is always visible
-const LG_BREAKPOINT = 1400;
-const lgQuery = window.matchMedia(`(min-width: ${LG_BREAKPOINT}px)`);
-
-// Toggle sidebar visibility
+// ===== Settings Drawer =====
 function toggleSidebar() {
-    // Sidebar is always visible on large desktop — no-op
-    if (lgQuery.matches) return;
-
     const sidebar = document.querySelector('.sidebar');
     const overlay = document.querySelector('.sidebar-overlay');
 
@@ -186,41 +179,38 @@ function toggleSidebar() {
     }
 }
 
-// Open sidebar and focus the add-feeding form
-function openAddFeeding() {
-    const sidebar = document.querySelector('.sidebar');
-    if (!sidebar) return;
-
-    // Open sidebar if it's not already visible
-    if (!lgQuery.matches && !sidebar.classList.contains('active')) {
-        toggleSidebar();
+// ===== Schedule Sheet =====
+function openScheduleSheet({ focusAdd = false, instant = false } = {}) {
+    const sheet = document.getElementById('schedule-sheet');
+    if (!sheet || sheet.open) return;
+    // instant: reopened after a refresh, so skip the slide-in — the view
+    // transition cross-fades the old sheet into the new one instead
+    sheet.classList.toggle('no-enter', instant);
+    sheet.showModal();
+    if (focusAdd) {
+        document.getElementById('sheet-add')?.scrollIntoView({ block: 'nearest' });
+        document.getElementById('feeding_time')?.focus();
+    } else if (!instant) {
+        // showModal() focuses the first control (a portion radio); park focus
+        // on the close button so nothing looks pre-selected
+        sheet.querySelector('[data-close-sheet]')?.focus();
     }
-
-    // Wait for sidebar transition to finish before focusing
-    setTimeout(() => {
-        const timeInput = document.getElementById('feeding_time');
-        if (timeInput) {
-            timeInput.focus();
-            // Scroll the sidebar content to show the form
-            const sidebarContent = document.querySelector('.sidebar-content');
-            if (sidebarContent) sidebarContent.scrollTop = 0;
-        }
-        const form = document.querySelector('.add-form');
-        if (form) {
-            form.classList.add('highlight');
-            setTimeout(() => form.classList.remove('highlight'), 1500);
-        }
-    }, 400); // matches sidebar transition duration (0.35s)
 }
 
-// Clean up sidebar state when crossing into large desktop
-lgQuery.addEventListener('change', (e) => {
-    if (e.matches) {
-        document.querySelector('.sidebar').classList.remove('active');
-        document.querySelector('.sidebar-overlay').classList.remove('active');
-        document.body.style.overflow = '';
-    }
-});
+function closeScheduleSheet() {
+    document.getElementById('schedule-sheet')?.close();
+}
+
+function initScheduleSheet() {
+    const sheet = document.getElementById('schedule-sheet');
+    if (!sheet) return;
+    sheet.querySelector('[data-close-sheet]')?.addEventListener('click', closeScheduleSheet);
+    // A click that lands on the <dialog> itself (not its contents) is the backdrop
+    sheet.addEventListener('click', e => {
+        if (e.target === sheet) closeScheduleSheet();
+    });
+    sheet.addEventListener('close', () => sheet.classList.remove('no-enter'));
+}
 
 // ===== Toasts =====
 function showToast(message, type = 'info', duration = 3500) {
@@ -261,24 +251,37 @@ function confirmAction(button, onConfirm) {
 // ===== Page Refresh =====
 // location.replace instead of reload(): reloads never get a cross-document
 // view transition, same-URL replaces do (see @view-transition in styles.css).
-// A replace doesn't restore scroll position like a reload does, so carry it over.
-const SCROLL_KEY = 'petfeedr-scroll-y';
+// A replace doesn't restore scroll position like a reload does, so carry it
+// over — plus the schedule sheet, so an edit doesn't close the editor.
+const PAGE_STATE_KEY = 'petfeedr-page-state';
 
 function refreshPage() {
-    try { sessionStorage.setItem(SCROLL_KEY, String(window.scrollY)); } catch {}
+    const sheet = document.getElementById('schedule-sheet');
+    const state = {
+        y: window.scrollY,
+        sheetOpen: !!sheet?.open,
+        sheetY: sheet?.querySelector('.sheet-body')?.scrollTop ?? 0,
+    };
+    try { sessionStorage.setItem(PAGE_STATE_KEY, JSON.stringify(state)); } catch {}
     window.location.replace(window.location.href);
 }
 
 // Called at the end of the DOMContentLoaded setup: after initCountdown has
 // inserted its line (or the restore lands that many px off), and before
-// first paint so the transition's "new" snapshot is already scrolled
-function restoreScroll() {
-    let y = null;
+// first paint so the transition's "new" snapshot is already in place
+function restorePageState() {
+    let state = null;
     try {
-        y = sessionStorage.getItem(SCROLL_KEY);
-        sessionStorage.removeItem(SCROLL_KEY);
+        state = JSON.parse(sessionStorage.getItem(PAGE_STATE_KEY));
+        sessionStorage.removeItem(PAGE_STATE_KEY);
     } catch {}
-    if (y !== null) window.scrollTo(0, Number(y));
+    if (!state) return;
+    window.scrollTo(0, Number(state.y) || 0);
+    if (state.sheetOpen) {
+        openScheduleSheet({ instant: true });
+        const body = document.querySelector('#schedule-sheet .sheet-body');
+        if (body) body.scrollTop = Number(state.sheetY) || 0;
+    }
 }
 
 // ===== AJAX Form Submission =====
@@ -416,8 +419,9 @@ function initAjaxForms() {
         submitForm(this);
     });
 
-    // Portion segmented control description
-    document.querySelectorAll('.portion-segmented input').forEach(radio => {
+    // Manual-feed portion description (scoped to the feed card: the schedule
+    // sheet's S/M/L radios auto-save on change, and this loop fires change)
+    document.querySelectorAll('.feed-card .portion-segmented input').forEach(radio => {
         radio.addEventListener('change', () => {
             const desc = document.getElementById('portion-desc');
             if (desc && typeof portionDescriptions !== 'undefined') {
@@ -437,9 +441,9 @@ function initAjaxForms() {
         });
     });
 
-    // Portion change (auto-submit on select change)
+    // Portion change (auto-submit when an S/M/L radio is picked)
     document.querySelectorAll('form[action="/update_portion"]').forEach(form => {
-        form.querySelector('select')?.addEventListener('change', () => submitForm(form));
+        form.addEventListener('change', () => submitForm(form));
         form.addEventListener('submit', e => e.preventDefault());
     });
 
@@ -511,7 +515,7 @@ function initCountdown() {
 
         if (!lastText) {
             // First tick fills in synchronously — nothing to fade from, and an
-            // empty line here would shift the layout under restoreScroll()
+            // empty line here would shift the layout under restorePageState()
             countdownEl.textContent = newText;
             lastText = newText;
         } else if (newText !== lastText) {
@@ -533,12 +537,13 @@ setInterval(() => {
     const tag = document.activeElement?.tagName;
     if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
     if (feedHoldActive) return;  // never yank the page out from under a hold
+    if (document.getElementById('schedule-sheet')?.open) return;  // mid-edit (e.g. a pending "Sure?")
     refreshPage();
 }, 60000);
 
 // Close sidebar on escape key
 document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !lgQuery.matches) {
+    if (e.key === 'Escape') {
         const sidebar = document.querySelector('.sidebar');
         if (sidebar.classList.contains('active')) {
             toggleSidebar();
@@ -546,10 +551,8 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-// Close sidebar when clicking outside on mobile/tablet
+// Close sidebar when clicking outside it
 document.addEventListener('click', (e) => {
-    if (lgQuery.matches) return;
-
     const sidebar = document.querySelector('.sidebar');
     const settingsToggle = document.querySelector('.settings-toggle');
 
