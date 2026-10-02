@@ -67,8 +67,8 @@ def add_job():
             schedule_store.write_entries(entries)
             actual_time = replace_today_entry(feeding_time, portion, is_fixed)
 
-        feeding_time_12h = datetime.strptime(feeding_time, "%H:%M").strftime("%I:%M %p")
-        actual_time_12h = datetime.strptime(actual_time, "%H:%M").strftime("%I:%M %p")
+        feeding_time_12h = datetime.strptime(feeding_time, "%H:%M").strftime("%I:%M %p").lstrip("0")
+        actual_time_12h = datetime.strptime(actual_time, "%H:%M").strftime("%I:%M %p").lstrip("0")
 
         if is_fixed:
             log.info(f"Added feeding time: {feeding_time_12h} ({portion} portion) (fixed)")
