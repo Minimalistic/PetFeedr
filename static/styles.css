@@ -528,6 +528,55 @@ body {
     display: block;
 }
 
+/* ===== Sleeping cat ===== */
+/* The z's drift above the drawing's box, so let them out of it */
+.all-fed-illustration {
+    overflow: visible;
+}
+
+/* Breathing: a slow rise, then a soft squish wider on the exhale. Pivots
+   on the bottom of the head so it settles rather than floats */
+.cat-breathe {
+    transform-box: fill-box;
+    transform-origin: 50% 100%;
+    animation: catBreathe 3.6s ease-in-out infinite;
+}
+
+@keyframes catBreathe {
+    0%, 100% { transform: scale(1, 1); }
+    40%      { transform: scale(0.98, 1.06); }    /* inhale: taller, a touch narrower */
+    70%      { transform: scale(1.045, 0.955); }  /* exhale: the squish */
+}
+
+/* z's float up and to the right, growing and fading, one leaving per
+   exhale (3 z's x 1.2s stagger = the 3.6s breath) */
+.sleep-z {
+    transform-box: fill-box;
+    transform-origin: center;
+    opacity: 0;
+    font-weight: 700;
+    animation: sleepZ 3.6s ease-out infinite;
+}
+
+.sleep-z.z2 { animation-delay: 1.2s; }
+.sleep-z.z3 { animation-delay: 2.4s; }
+
+@keyframes sleepZ {
+    0%   { opacity: 0;    transform: translate(0, 0) scale(0.5) rotate(-10deg); }
+    15%  { opacity: 0.9; }
+    50%  {                transform: translate(14px, -24px) scale(1) rotate(8deg); }
+    100% { opacity: 0;    transform: translate(30px, -50px) scale(1.5) rotate(-6deg); }
+}
+
+/* Reduced motion: still z's in a little rising stack, cat at rest */
+@media (prefers-reduced-motion: reduce) {
+    .cat-breathe { animation: none; }
+    .sleep-z { animation: none; }
+    .sleep-z.z1 { opacity: 0.75; transform: translate(0, 0) scale(0.7); }
+    .sleep-z.z2 { opacity: 0.55; transform: translate(12px, -14px) scale(0.9); }
+    .sleep-z.z3 { opacity: 0.4; transform: translate(24px, -30px) scale(1.1); }
+}
+
 .all-fed-text {
     font-family: var(--font-display);
     font-size: clamp(1.2rem, 3vw, 1.5rem);

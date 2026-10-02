@@ -3,17 +3,21 @@
 import { $, html, trusted, setHTML, pulse } from '../dom.js';
 import { onTick } from '../ticker.js';
 
+// Asleep: the head breathes (CSS .cat-breathe) and z's drift up off it
+// (.sleep-z, staggered). z's use currentColor so they read on both themes
 const SLEEPING_CAT = trusted(`
     <svg class="all-fed-illustration" width="80" height="80" viewBox="0 0 100 100" fill="none" aria-hidden="true">
-        <circle cx="50" cy="45" r="30" fill="white" opacity="0.9"/>
-        <path d="M25,35 L32,10 L42,30" fill="white" opacity="0.9"/>
-        <path d="M75,35 L68,10 L58,30" fill="white" opacity="0.9"/>
-        <path d="M35,42 Q42,36 49,42" stroke="#555" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-        <path d="M51,42 Q58,36 65,42" stroke="#555" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-        <path d="M46,50 L50,53 L54,50" stroke="#f08080" stroke-width="2" fill="#f08080" stroke-linejoin="round"/>
-        <text x="72" y="25" font-size="10" fill="white" opacity="0.7" font-family="sans-serif">z</text>
-        <text x="80" y="18" font-size="13" fill="white" opacity="0.5" font-family="sans-serif">z</text>
-        <text x="86" y="8" font-size="16" fill="white" opacity="0.3" font-family="sans-serif">z</text>
+        <g class="cat-breathe">
+            <circle cx="50" cy="45" r="30" fill="white" opacity="0.9"/>
+            <path d="M25,35 L32,10 L42,30" fill="white" opacity="0.9"/>
+            <path d="M75,35 L68,10 L58,30" fill="white" opacity="0.9"/>
+            <path d="M35,42 Q42,36 49,42" stroke="#555" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+            <path d="M51,42 Q58,36 65,42" stroke="#555" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+            <path d="M46,50 L50,53 L54,50" stroke="#f08080" stroke-width="2" fill="#f08080" stroke-linejoin="round"/>
+        </g>
+        <text class="sleep-z z1" x="68" y="28" font-size="17" fill="currentColor" font-family="sans-serif">z</text>
+        <text class="sleep-z z2" x="68" y="28" font-size="17" fill="currentColor" font-family="sans-serif">z</text>
+        <text class="sleep-z z3" x="68" y="28" font-size="17" fill="currentColor" font-family="sans-serif">z</text>
     </svg>`);
 
 let target = null;     // 'HH:MM' of today's next feed, null when nothing is counting down
