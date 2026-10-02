@@ -6,14 +6,24 @@ function getEffectiveTheme(mode) {
     return darkQuery.matches ? 'dark' : 'light';
 }
 
+const THEME_MODES = ['auto', 'light', 'dark'];
+const THEME_NAMES = { auto: 'Auto', light: 'Light', dark: 'Dark' };
+
+function nextThemeMode(mode) {
+    return THEME_MODES[(THEME_MODES.indexOf(mode) + 1) % THEME_MODES.length];
+}
+
+function syncThemeToggle(mode) {
+    const btn = document.querySelector('.theme-toggle');
+    if (!btn) return;
+    btn.dataset.mode = mode;
+    btn.setAttribute('aria-label', `Theme: ${THEME_NAMES[mode]}. Tap for ${THEME_NAMES[nextThemeMode(mode)]}.`);
+}
+
 function setThemeMode(mode) {
     localStorage.setItem('petfeedr-theme', mode);
     document.documentElement.setAttribute('data-theme', getEffectiveTheme(mode));
-    document.querySelectorAll('.theme-opt').forEach(btn => {
-        const active = btn.dataset.mode === mode;
-        btn.classList.toggle('active', active);
-        btn.setAttribute('aria-checked', active);
-    });
+    syncThemeToggle(mode);
 }
 
 // Apply before DOM ready to prevent flash
@@ -30,13 +40,18 @@ darkQuery.addEventListener('change', () => {
     }
 });
 
-function initThemePicker() {
-    const mode = localStorage.getItem('petfeedr-theme') || 'auto';
-    document.querySelectorAll('.theme-opt').forEach(btn => {
-        const active = btn.dataset.mode === mode;
-        btn.classList.toggle('active', active);
-        btn.setAttribute('aria-checked', active);
-        btn.addEventListener('click', () => setThemeMode(btn.dataset.mode));
+function initThemeToggle() {
+    const btn = document.querySelector('.theme-toggle');
+    if (!btn) return;
+    syncThemeToggle(localStorage.getItem('petfeedr-theme') || 'auto');
+    let lastToast = null;
+    btn.addEventListener('click', () => {
+        const mode = nextThemeMode(btn.dataset.mode);
+        setThemeMode(mode);
+        // Auto can look identical to the mode you were just in, so say it —
+        // replacing the previous toast so quick taps don't stack them up
+        lastToast?.remove();
+        lastToast = showToast(`Theme: ${THEME_NAMES[mode]}`, 'info', 1500);
     });
 }
 
@@ -148,7 +163,7 @@ function initRhythm() {
 
 // Update icon and init features once DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
-    initThemePicker();
+    initThemeToggle();
     initCountdown();
     initTimeline();
     initRhythm();
@@ -162,22 +177,6 @@ document.addEventListener('DOMContentLoaded', () => {
         navigator.serviceWorker.register('/sw.js', { scope: '/' });
     }
 });
-
-// ===== Settings Drawer =====
-function toggleSidebar() {
-    const sidebar = document.querySelector('.sidebar');
-    const overlay = document.querySelector('.sidebar-overlay');
-
-    sidebar.classList.toggle('active');
-    overlay.classList.toggle('active');
-
-    // Prevent body scroll when sidebar is open
-    if (sidebar.classList.contains('active')) {
-        document.body.style.overflow = 'hidden';
-    } else {
-        document.body.style.overflow = '';
-    }
-}
 
 // ===== Schedule Sheet =====
 function openScheduleSheet({ focusAdd = false, instant = false } = {}) {
@@ -224,6 +223,7 @@ function showToast(message, type = 'info', duration = 3500) {
         toast.classList.add('removing');
         toast.addEventListener('animationend', () => toast.remove());
     }, duration);
+    return toast;
 }
 
 // ===== Inline Confirm =====
@@ -540,25 +540,3 @@ setInterval(() => {
     if (document.getElementById('schedule-sheet')?.open) return;  // mid-edit (e.g. a pending "Sure?")
     refreshPage();
 }, 60000);
-
-// Close sidebar on escape key
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-        const sidebar = document.querySelector('.sidebar');
-        if (sidebar.classList.contains('active')) {
-            toggleSidebar();
-        }
-    }
-});
-
-// Close sidebar when clicking outside it
-document.addEventListener('click', (e) => {
-    const sidebar = document.querySelector('.sidebar');
-    const settingsToggle = document.querySelector('.settings-toggle');
-
-    if (sidebar.classList.contains('active') &&
-        !sidebar.contains(e.target) &&
-        !settingsToggle.contains(e.target)) {
-        toggleSidebar();
-    }
-});
