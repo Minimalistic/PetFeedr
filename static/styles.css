@@ -823,10 +823,6 @@ body {
     50%      { box-shadow: 0 0 30px rgba(39,174,96,0.6); }
 }
 
-.feed-circle-btn.fed {
-    animation: feedPulse 0.8s ease;
-}
-
 /* Segmented Portion Control */
 .portion-segmented {
     display: flex;
@@ -1408,16 +1404,9 @@ body {
 
 .feed-hold.holding .hold-ring-fill {
     stroke-dashoffset: 0;
-    transition: stroke-dashoffset 0.7s linear;  /* keep in step with HOLD_MS in main.js */
-}
-
-.feed-hold.fired .hold-ring-fill {
-    stroke: var(--color-success);
-    stroke-dashoffset: 0;
-}
-
-.feed-hold.holding .feed-circle-btn {
-    transform: scale(0.94);
+    /* Ease-in: the fill starts slow and rushes to the end, so a hold builds
+       tension. Duration matches HOLD_MS in static/js/cards/feed.js */
+    transition: stroke-dashoffset 0.7s cubic-bezier(0.55, 0, 0.85, 0.35);
 }
 
 .feed-circle-btn {
@@ -1471,7 +1460,131 @@ body {
     color: var(--color-accent-dark);
 }
 
-/* ===== Kibble Drop ===== */
+/* ===== Feed Sequence =====
+   feed.js walks .feed-hold through: holding → dispensing → done (or failed).
+   Kibble pieces are flown from JS (per-keyframe easing for the arc). */
+
+/* Release: spring back past rest and settle, like a physical button */
+.feed-hold .feed-circle-btn {
+    transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1),
+                box-shadow 0.3s ease, background 0.3s ease;
+}
+
+/* Press: squish in and charge up a glow alongside the ring */
+.feed-hold.holding .feed-circle-btn {
+    transform: scale(0.92);
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--color-accent) 25%, transparent),
+                0 0 34px color-mix(in srgb, var(--color-accent) 55%, transparent);
+    transition: transform 0.7s cubic-bezier(0.55, 0, 0.85, 0.35),
+                box-shadow 0.7s cubic-bezier(0.55, 0, 0.85, 0.35);
+}
+
+/* Dispensing: the ring becomes a sweeping arc while the motor runs */
+.feed-hold.dispensing .hold-ring {
+    animation: ringSweep 0.9s linear infinite;
+}
+
+.feed-hold.dispensing .hold-ring-fill {
+    stroke-dashoffset: 72;
+    transition: stroke-dashoffset 0.3s ease-out;
+}
+
+@keyframes ringSweep {
+    from { transform: rotate(-90deg); }
+    to   { transform: rotate(270deg); }
+}
+
+/* Done: green ring, a springy pop, FEED turns into a drawn checkmark */
+.feed-hold.done .hold-ring-fill {
+    stroke: var(--color-success);
+    stroke-dashoffset: 0;
+}
+
+.feed-hold.done .feed-circle-btn {
+    background: var(--color-success);
+    /* The feed that uses up the last extras disables the button mid-celebration;
+       finish the moment at full strength, then let it grey out */
+    opacity: 1;
+    animation: feedPop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes feedPop {
+    0%   { transform: scale(0.92); }
+    45%  { transform: scale(1.12); }
+    100% { transform: scale(1); }
+}
+
+.feed-circle-label {
+    display: inline-block;
+    transition: opacity 0.2s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.feed-hold.done .feed-circle-label {
+    opacity: 0;
+    transform: scale(0.6);
+}
+
+.feed-check {
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    width: 46%;
+    height: 46%;
+    fill: none;
+    stroke: white;
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    opacity: 0;
+    transition: stroke-dashoffset 0.35s ease-out 0.12s, opacity 0.1s ease 0.1s;
+}
+
+.feed-hold.done .feed-check {
+    stroke-dashoffset: 0;
+    opacity: 1;
+}
+
+/* One expanding ring when the dispense lands */
+.feed-shockwave {
+    position: absolute;
+    inset: 9px;
+    border-radius: 50%;
+    border: 3px solid var(--color-success);
+    pointer-events: none;
+    animation: shockwave 0.7s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+
+@keyframes shockwave {
+    from { transform: scale(1);   opacity: 0.8; }
+    to   { transform: scale(1.9); opacity: 0; }
+}
+
+/* Failed: a short "no" shake while the ring drains */
+.feed-hold.failed .feed-circle-btn {
+    animation: feedShake 0.42s ease;
+}
+
+@keyframes feedShake {
+    0%, 100% { transform: translateX(0); }
+    20%      { transform: translateX(-7px); }
+    40%      { transform: translateX(6px); }
+    60%      { transform: translateX(-4px); }
+    80%      { transform: translateX(2px); }
+}
+
+.hold-hint.is-active {
+    color: var(--color-primary);
+    font-weight: 600;
+}
+
+.hold-hint.is-done {
+    color: var(--color-success);
+    font-weight: 600;
+}
+
+/* Kibble: positioned and flown by feed.js */
 .kibble {
     position: absolute;
     width: var(--size);
@@ -1480,14 +1593,10 @@ body {
     background: radial-gradient(circle at 35% 30%, #dba46b, #9c5f2a 70%);
     pointer-events: none;
     z-index: 3;
-    animation: kibbleFall 0.95s cubic-bezier(0.35, 0.1, 0.6, 1) var(--delay) both;
 }
 
-@keyframes kibbleFall {
-    0%   { opacity: 0; transform: translate(0, 0) rotate(0); }
-    10%  { opacity: 1; }
-    80%  { opacity: 1; }
-    100% { opacity: 0; transform: translate(var(--dx), 110px) rotate(var(--rot)); }
+.kibble.is-dark {
+    background: radial-gradient(circle at 35% 30%, #b97a45, #6e3e17 70%);
 }
 
 /* ===== Streak ===== */
