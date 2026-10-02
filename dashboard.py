@@ -37,9 +37,9 @@ def read_schedules_with_details():
             continue
         schedules.append({
             'base_time_24h': time_str,
-            'base_time_12h': base_dt.strftime("%I:%M %p"),
+            'base_time_12h': base_dt.strftime("%I:%M %p").lstrip("0"),
             'actual_time_24h': actual_time,
-            'actual_time_12h': actual_dt.strftime("%I:%M %p"),
+            'actual_time_12h': actual_dt.strftime("%I:%M %p").lstrip("0"),
             'portion': entry['portion'],
             'is_fixed': entry['is_fixed'],
             'randomized': actual_time != time_str,

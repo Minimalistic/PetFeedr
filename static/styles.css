@@ -27,7 +27,6 @@
     --radius-md: 12px;
     --radius-lg: 20px;
     
-    --sidebar-width: 340px;
     --card-padding: clamp(0.75rem, 1.5vw, 1.25rem);
 
     --color-border: rgba(0,0,0,0.08);
@@ -100,109 +99,11 @@ body {
     background: linear-gradient(135deg, var(--color-bg) 0%, var(--color-bg-warm) 100%);
     background-attachment: fixed;
     color: var(--color-text);
-    height: 100vh;
-    height: 100dvh;
-    overflow: hidden;
+    /* The document scrolls, not an inner box — keeps iOS tap-status-bar-to-top,
+       a collapsing address bar, and native scroll restoration */
+    min-height: 100vh;
+    min-height: 100dvh;
     line-height: 1.5;
-}
-
-/* ===== Sidebar ===== */
-.sidebar-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.4);
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity 0.3s ease, visibility 0.3s ease;
-    z-index: 100;
-}
-
-.sidebar-overlay.active {
-    opacity: 1;
-    visibility: visible;
-}
-
-.sidebar {
-    position: fixed;
-    top: 0;
-    right: -100%;
-    width: min(var(--sidebar-width), 90vw);
-    height: 100vh;
-    background: var(--color-surface);
-    box-shadow: var(--shadow-lg);
-    z-index: 101;
-    transition: right 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-}
-
-.sidebar.active {
-    right: 0;
-}
-
-.sidebar-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1.25rem 1.5rem;
-    border-bottom: 1px solid var(--color-border);
-    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
-    color: white;
-}
-
-.sidebar-header h2 {
-    font-family: var(--font-display);
-    font-weight: 600;
-    font-size: 1.4rem;
-}
-
-.sidebar-close {
-    background: rgba(255,255,255,0.2);
-    border: none;
-    color: white;
-    font-size: 1.5rem;
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    cursor: pointer;
-    transition: background 0.2s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.sidebar-close:hover {
-    background: rgba(255,255,255,0.3);
-}
-
-.sidebar-content {
-    flex: 1;
-    overflow-y: auto;
-    padding: 0.75rem;
-}
-
-.sidebar-section {
-    background: var(--color-bg);
-    border-radius: var(--radius-md);
-    padding: 0.85rem;
-    margin-bottom: 0.6rem;
-}
-
-.sidebar-section.highlight,
-.add-form.highlight {
-    outline: 2px solid var(--color-primary);
-    outline-offset: 4px;
-    border-radius: var(--radius-md);
-    transition: outline-color 1.5s ease;
-}
-
-.sidebar-section h3 {
-    font-family: var(--font-display);
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--color-primary-dark);
-    margin-bottom: 0.6rem;
 }
 
 /* ===== Forms ===== */
@@ -393,77 +294,19 @@ body {
     color: white;
 }
 
-/* ===== Edit Schedule List ===== */
-.edit-schedule-list {
-    list-style: none;
-}
-
-.edit-schedule-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.4rem 0.5rem;
-    background: var(--color-surface);
-    border-radius: var(--radius-sm);
-    margin-bottom: 0.35rem;
-    gap: 0.3rem;
-    overflow: hidden;
-}
-
-.edit-schedule-info {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    min-width: 0;
-    overflow: hidden;
-}
-
-.edit-time {
-    font-weight: 600;
-    font-size: 0.95rem;
-}
-
-.edit-portion {
-    font-size: 0.75rem;
-    padding: 0.2rem 0.5rem;
-    border-radius: 4px;
-    text-transform: capitalize;
-}
-
-.fixed-icon {
-    font-size: 0.8rem;
-}
-
-.edit-schedule-actions {
-    display: flex;
-    gap: 0.2rem;
-    align-items: center;
-    flex-shrink: 0;
-}
-
-.portion-mini {
-    padding: 0.3rem 0.4rem;
-    font-size: 0.8rem;
-    color: var(--color-text);
-    border: 1px solid var(--color-border);
-    border-radius: 4px;
-    background: var(--color-input-bg);
-}
-
-.inline-form {
-    display: inline;
-}
-
 /* ===== Dashboard ===== */
 .dashboard {
     max-width: 1060px;
     margin: 0 auto;
     padding: clamp(0.5rem, 1vw, 0.75rem) clamp(0.75rem, 3vw, 3rem);
-    height: 100vh;
-    height: 100dvh;
+    padding-bottom: 0;
+    min-height: 100vh;
+    min-height: 100dvh;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    /* clip, not hidden: hidden would make this a scroll container and
+       break the sticky footer; clip just stops stray tooltips widening the page */
+    overflow-x: clip;
 }
 
 .dashboard-back-link {
@@ -497,7 +340,7 @@ body {
     color: var(--color-primary);
 }
 
-.settings-toggle {
+.theme-toggle {
     background: var(--color-surface);
     border: none;
     width: 48px;
@@ -512,44 +355,22 @@ body {
     transition: box-shadow 0.2s ease, color 0.2s ease;
 }
 
-.settings-toggle:hover {
+.theme-toggle:hover {
     box-shadow: var(--shadow-md);
     color: var(--color-primary);
 }
 
-.theme-picker {
-    display: flex;
-    border: 1px solid var(--color-border);
-    border-radius: 6px;
-    overflow: hidden;
-    background: var(--color-input-bg);
+.theme-icon { display: none; }
+.theme-toggle[data-mode="auto"] .icon-auto,
+.theme-toggle[data-mode="light"] .icon-light,
+.theme-toggle[data-mode="dark"] .icon-dark {
+    display: block;
+    animation: themeIconIn 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.3);
 }
 
-.theme-opt {
-    flex: 1;
-    background: none;
-    border: none;
-    padding: 0.5rem;
-    font-size: 0.85rem;
-    font-weight: 500;
-    color: var(--color-text-muted);
-    cursor: pointer;
-    transition: background 0.15s, color 0.15s;
-    font-family: var(--font-body);
-}
-
-.theme-opt + .theme-opt {
-    border-left: 1px solid var(--color-border);
-}
-
-.theme-opt.active {
-    background: var(--color-primary);
-    color: #fff;
-}
-
-.theme-opt:focus-visible {
-    outline: 2px solid var(--color-primary);
-    outline-offset: -2px;
+@keyframes themeIconIn {
+    from { opacity: 0; transform: rotate(-90deg) scale(0.6); }
+    to   { opacity: 1; transform: none; }
 }
 
 .dashboard-header-actions {
@@ -562,11 +383,7 @@ body {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: clamp(0.4rem, 1vw, 0.75rem);
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-    overflow-x: hidden;
-    -webkit-overflow-scrolling: touch;
+    align-content: start;
 }
 
 @media (max-width: 600px) {
@@ -1339,10 +1156,6 @@ body {
     font-style: italic;
 }
 
-/* Large-screen visibility utilities */
-.show-on-lg { display: none; }
-.hide-on-lg { display: inline-flex; }
-
 /* ===== Toasts ===== */
 #toast-container {
     position: fixed;
@@ -1456,10 +1269,17 @@ body {
     flex-wrap: wrap;
     gap: 0.5rem;
     padding: clamp(0.25rem, 0.5vw, 0.5rem);
+    padding-bottom: max(clamp(0.25rem, 0.5vw, 0.5rem), env(safe-area-inset-bottom));
     margin-top: auto;
     flex-shrink: 0;
     font-size: 0.75rem;
     color: var(--color-text-muted);
+    /* Stays pinned like before, now that the page itself scrolls */
+    position: sticky;
+    bottom: 0;
+    background: color-mix(in srgb, var(--color-bg) 85%, transparent);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
 }
 
 .footer-divider {
@@ -1469,39 +1289,6 @@ body {
 .footer-sim {
     color: var(--color-warning);
     font-weight: 600;
-}
-
-/* ===== Responsive ===== */
-/* Only one breakpoint: sidebar pinning at large desktop.
-   Everything else scales fluidly via clamp() and auto-fit grid. */
-
-@media screen and (min-width: 1400px) {
-    body {
-        padding-right: var(--sidebar-width);
-    }
-
-    .sidebar-overlay {
-        display: none !important;
-    }
-
-    .sidebar {
-        right: 0;
-        width: var(--sidebar-width);
-        transition: none;
-        border-left: 1px solid var(--color-border);
-        box-shadow: none;
-    }
-
-    .sidebar-close {
-        display: none;
-    }
-
-    .settings-toggle {
-        display: none;
-    }
-
-    .show-on-lg { display: block; }
-    .hide-on-lg { display: none !important; }
 }
 
 /* ===== Hopper Card ===== */
@@ -1770,4 +1557,286 @@ body {
 .hopper-sub {
     font-size: 0.8rem;
     color: var(--color-text-muted);
+}
+
+/* ===== Card header action ===== */
+/* A real button, not a corner link: the schedule editor's only way in */
+.card-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--color-primary);
+    background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+    border: none;
+    min-height: 36px;
+    padding: 0.35rem 0.85rem;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.15s ease;
+}
+
+.card-action:hover {
+    background: color-mix(in srgb, var(--color-primary) 20%, transparent);
+}
+
+.card-action:active {
+    transform: scale(0.96);
+}
+
+.schedule-card .card-label-row {
+    align-items: center;
+}
+
+/* ===== Schedule Sheet ===== */
+/* Phones: slides up from the bottom. Desktop: centered panel (see media query).
+   Entry/exit animate via @starting-style + allow-discrete transitions
+   (Chrome 117+, Safari 17.5+); older browsers just snap open/closed. */
+.sheet {
+    position: fixed;
+    inset: auto 0 0 0;
+    width: 100%;
+    max-width: 100%;
+    max-height: 88dvh;
+    margin: 0;
+    padding: 0;
+    border: none;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    background: var(--color-surface);
+    color: var(--color-text);
+    box-shadow: var(--shadow-lg);
+    flex-direction: column;
+    transform: translateY(100%);
+    transition:
+        transform 0.35s cubic-bezier(0.2, 0.9, 0.3, 1),
+        overlay 0.35s allow-discrete,
+        display 0.35s allow-discrete;
+}
+
+.sheet[open] {
+    display: flex;
+    transform: none;
+}
+
+@starting-style {
+    .sheet[open] { transform: translateY(100%); }
+}
+
+.sheet::backdrop {
+    background: rgba(0, 0, 0, 0);
+    transition:
+        background 0.3s ease,
+        overlay 0.3s allow-discrete,
+        display 0.3s allow-discrete;
+}
+
+.sheet[open]::backdrop {
+    background: rgba(0, 0, 0, 0.4);
+}
+
+@starting-style {
+    .sheet[open]::backdrop { background: rgba(0, 0, 0, 0); }
+}
+
+/* The page behind a modal sheet shouldn't scroll */
+body:has(.sheet[open]) {
+    overflow: hidden;
+}
+
+.sheet-grabber {
+    width: 36px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--color-border);
+    margin: 0.5rem auto 0;
+    flex-shrink: 0;
+}
+
+.sheet-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 1rem 0.25rem;
+    flex-shrink: 0;
+}
+
+.sheet-header h2 {
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.sheet-close {
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 50%;
+    background: var(--color-bg);
+    color: var(--color-text-muted);
+    font-size: 1.3rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.sheet-body {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 0.5rem 1rem max(1rem, env(safe-area-inset-bottom));
+}
+
+@media (min-width: 700px) {
+    .sheet {
+        inset: 0;
+        margin: auto;
+        width: min(480px, calc(100% - 2rem));
+        height: fit-content;
+        max-height: 85dvh;
+        border-radius: var(--radius-lg);
+        transform: none;
+        opacity: 0;
+        scale: 0.96;
+        transition:
+            opacity 0.2s ease,
+            scale 0.25s cubic-bezier(0.2, 0.9, 0.3, 1),
+            overlay 0.25s allow-discrete,
+            display 0.25s allow-discrete;
+    }
+    .sheet[open] { opacity: 1; scale: 1; }
+    @starting-style {
+        .sheet[open] { opacity: 0; scale: 0.96; }
+    }
+    .sheet-grabber { display: none; }
+    .sheet-header { padding-top: 1rem; }
+}
+
+/* Schedule rows */
+.sched-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.sched-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto auto;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.6rem;
+    background: var(--color-bg);
+    border-radius: var(--radius-md);
+}
+
+.sched-time {
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.sched-chip {
+    font: inherit;
+    font-size: 0.75rem;
+    font-weight: 600;
+    min-width: 4rem;
+    padding: 0.35rem 0.6rem;
+    border-radius: 999px;
+    border: 1.5px dashed var(--color-primary);
+    background: transparent;
+    color: var(--color-primary);
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.sched-chip.is-fixed {
+    border-style: solid;
+    border-color: var(--color-text-muted);
+    color: var(--color-text-muted);
+}
+
+.sched-row .btn-delete {
+    min-width: 2.25rem;
+    min-height: 2.25rem;
+}
+
+.sched-legend {
+    margin: 0.5rem 0.25rem 0;
+}
+
+.portion-segmented.is-compact .portion-segment-label {
+    padding: 0.35rem 0.7rem;
+    font-size: 0.8rem;
+}
+
+/* Add form */
+.sheet-add {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--color-border);
+}
+
+.sheet-add h3 {
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 0.6rem;
+}
+
+.add-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.add-row input[type="time"] {
+    flex: 1;
+    min-width: 0;
+    padding: 0.45rem 0.75rem;
+    font: inherit;
+    font-size: 1rem;
+    color: var(--color-text);
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-input-bg);
+}
+
+.add-row input[type="time"]:focus {
+    outline: none;
+    border-color: var(--color-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sheet, .sheet::backdrop { transition: none; }
+}
+
+/* ===== Live updates ===== */
+/* The kibble level slides to its new height (hopper.js sets the transform) */
+.hopper-fill {
+    transition: transform 0.9s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+.timeline-dot {
+    transition: background-color 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;
+}
+
+.day-detail-message {
+    text-align: center;
+    color: var(--color-text-muted);
+}
+
+.footer-offline {
+    color: var(--color-danger);
+    font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .hopper-fill { transition: none; }
+}
+
+.noscript-note {
+    margin-bottom: 0.75rem;
+    text-align: center;
 }

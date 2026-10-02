@@ -1,12 +1,27 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-asset-version="{{ asset_version }}">
     <head>
         <title>PetFeedr</title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        <!-- Theme before first paint, so dark mode never flashes light -->
+        <script>
+            (function () {
+                var mode = 'auto';
+                try { mode = localStorage.getItem('petfeedr-theme') || 'auto'; } catch (e) {}
+                var dark = mode === 'dark' || (mode === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
+                document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+            })();
+        </script>
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
         <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;500;600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-        <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles.css') }}">
+        <!-- ?v= gives each release its own URL, so an older service worker's
+             cache-first copy can't pair last release's CSS with this page -->
+        <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles.css', v=asset_version) }}">
+        <!-- Fetch every module in parallel instead of discovering imports one hop at a time -->
+        {% for mod in ['app', 'dom', 'api', 'store', 'toast', 'theme', 'ticker', 'cards/next', 'cards/timeline', 'cards/feed', 'cards/stats', 'cards/hopper', 'cards/sheet', 'cards/footer'] %}
+        <link rel="modulepreload" href="{{ url_for('static', filename='js/' ~ mod ~ '.js') }}">
+        {% endfor %}
         <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
         <meta name="theme-color" content="#00838f">
         <meta name="apple-mobile-web-app-capable" content="yes">
@@ -14,370 +29,94 @@
         <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='icon.svg') }}">
     </head>
     <body>
-        <!-- Settings Sidebar -->
-        <div class="sidebar-overlay" onclick="toggleSidebar()" aria-hidden="true"></div>
-        <aside class="sidebar" role="dialog" aria-label="Settings">
-            <div class="sidebar-header">
-                <h2>Settings</h2>
-                <button class="sidebar-close" onclick="toggleSidebar()" aria-label="Close settings">×</button>
-            </div>
-            
-            <div class="sidebar-content">
-                <!-- Appearance -->
-                <section class="sidebar-section">
-                    <h3>Appearance</h3>
-                    <div class="theme-picker" role="radiogroup" aria-label="Color theme">
-                        <button class="theme-opt" data-mode="auto" role="radio" aria-checked="true" aria-label="Auto theme">Auto</button>
-                        <button class="theme-opt" data-mode="light" role="radio" aria-checked="false" aria-label="Light theme">Light</button>
-                        <button class="theme-opt" data-mode="dark" role="radio" aria-checked="false" aria-label="Dark theme">Dark</button>
-                    </div>
-                </section>
-
-                <!-- Add New Feeding -->
-                <section class="sidebar-section">
-                    <h3>Add Feeding Time</h3>
-                    <form action="/add" method="post" class="add-form">
-                        <div class="form-group">
-                            <label for="feeding_time">Time</label>
-                            <input type="time" id="feeding_time" name="feeding_time" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="portion">Portion</label>
-                            <select id="portion" name="portion">
-                                {% for name, (cycles, desc) in portion_sizes.items() %}
-                                    <option value="{{ name }}" {% if name == default_portion %}selected{% endif %}>
-                                        {{ name | capitalize }} ({{ desc }})
-                                    </option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <label class="toggle-switch">
-                            <input type="checkbox" name="randomize" checked>
-                            <span class="toggle-slider"></span>
-                            <span class="toggle-label-text">Randomize time</span>
-                        </label>
-                        <p class="setting-description">Varies feeding time by ±30 min daily</p>
-                        <button type="submit" class="btn btn-primary">Add Feeding</button>
-                    </form>
-                </section>
-                
-                <!-- Edit Schedule -->
-                <section class="sidebar-section">
-                    <h3>Edit Schedule</h3>
-                    {% if schedules %}
-                        <ul class="edit-schedule-list">
-                            {% for sched in schedules %}
-                                <li class="edit-schedule-item">
-                                    <div class="edit-schedule-info">
-                                        <span class="edit-time">{{ sched.actual_time_12h }}</span>
-                                        <span class="edit-portion portion-{{ sched.portion }}">{{ sched.portion }}</span>
-                                        {% if sched.is_fixed %}<span class="fixed-icon">🔒</span>{% endif %}
-                                    </div>
-                                    <div class="edit-schedule-actions">
-                                        <form action="/update_portion" method="post" class="inline-form">
-                                            <input type="hidden" name="base_time" value="{{ sched.base_time_24h }}">
-                                            <select name="portion" class="portion-mini" aria-label="Change portion for {{ sched.actual_time_12h }}">
-                                                {% for name, (cycles, desc) in portion_sizes.items() %}
-                                                    <option value="{{ name }}" {% if sched.portion == name %}selected{% endif %}>{{ name | capitalize }}</option>
-                                                {% endfor %}
-                                            </select>
-                                        </form>
-                                        <form action="/toggle_fixed" method="post" class="inline-form">
-                                            <input type="hidden" name="base_time" value="{{ sched.base_time_24h }}">
-                                            <button type="submit" class="btn-icon" title="{% if sched.is_fixed %}Unlock{% else %}Lock{% endif %} {{ sched.actual_time_12h }} feeding time" aria-label="{% if sched.is_fixed %}Unlock{% else %}Lock{% endif %} {{ sched.actual_time_12h }} feeding time">
-                                                {% if sched.is_fixed %}🔓{% else %}🔒{% endif %}
-                                            </button>
-                                        </form>
-                                        <form action="/delete" method="post" class="inline-form">
-                                            <input type="hidden" name="base_time" value="{{ sched.base_time_24h }}">
-                                            <button type="submit" class="btn-icon btn-delete" title="Delete {{ sched.actual_time_12h }} feeding" aria-label="Delete {{ sched.actual_time_12h }} feeding">✕</button>
-                                        </form>
-                                    </div>
-                                </li>
-                            {% endfor %}
-                        </ul>
-                    {% else %}
-                        <p class="empty-state">No scheduled feedings yet</p>
-                    {% endif %}
-                </section>
-
-
-            </div>
-        </aside>
-
-        <!-- Main Dashboard -->
+        <!-- A shell: static/js renders every card from the state below and
+             keeps it current in place — the page never reloads itself -->
         <main class="dashboard">
             <header class="dashboard-header">
                 <h1><span class="pet">Pet</span><span class="feedr">Feedr</span></h1>
-                <button class="settings-toggle" onclick="toggleSidebar()" title="Settings" aria-label="Open settings">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                        <circle cx="12" cy="12" r="3"></circle>
-                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                <!-- One button cycles Auto → Light → Dark; the icon shows the current mode -->
+                <button type="button" class="theme-toggle" data-mode="auto" aria-label="Theme: Auto. Tap for Light.">
+                    <svg class="theme-icon icon-auto" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <circle cx="12" cy="12" r="9"/>
+                        <path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/>
+                    </svg>
+                    <svg class="theme-icon icon-light" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                        <circle cx="12" cy="12" r="4"/>
+                        <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>
+                    </svg>
+                    <svg class="theme-icon icon-dark" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
                     </svg>
                 </button>
             </header>
 
-            <div class="dashboard-content">
-                <!-- Next Feeding Card -->
-                <section class="card next-feeding-card {% if all_fed_today %}all-fed{% endif %}" data-next-feeding="{{ next_feeding.actual_time_24h if next_feeding and not all_fed_today else '' }}">
-                    <div class="card-label">Next Feeding</div>
-                    {% if all_fed_today and next_feeding %}
-                        <div class="all-fed-content">
-                            <svg class="all-fed-illustration" width="80" height="80" viewBox="0 0 100 100" fill="none">
-                                <circle cx="50" cy="45" r="30" fill="white" opacity="0.9"/>
-                                <path d="M25,35 L32,10 L42,30" fill="white" opacity="0.9"/>
-                                <path d="M75,35 L68,10 L58,30" fill="white" opacity="0.9"/>
-                                <path d="M35,42 Q42,36 49,42" stroke="#555" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-                                <path d="M51,42 Q58,36 65,42" stroke="#555" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-                                <path d="M46,50 L50,53 L54,50" stroke="#f08080" stroke-width="2" fill="#f08080" stroke-linejoin="round"/>
-                                <text x="72" y="25" font-size="10" fill="white" opacity="0.7" font-family="sans-serif">z</text>
-                                <text x="80" y="18" font-size="13" fill="white" opacity="0.5" font-family="sans-serif">z</text>
-                                <text x="86" y="8" font-size="16" fill="white" opacity="0.3" font-family="sans-serif">z</text>
-                            </svg>
-                            <div class="all-fed-text">All fed for today!</div>
-                            <div class="all-fed-subtext">Next feeding tomorrow at {{ next_feeding.actual_time_12h }}</div>
-                        </div>
-                    {% elif next_feeding %}
-                        <div class="next-feeding-time">{{ next_feeding.actual_time_12h }}</div>
-                        <div class="next-feeding-portion">
-                            <span class="portion-badge portion-{{ next_feeding.portion }}">{{ next_feeding.portion }}</span>
-                            {% if next_feeding.randomized %}
-                                <span class="randomized-note">randomized</span>
-                            {% endif %}
-                        </div>
-                    {% else %}
-                        <div class="next-feeding-time">--:--</div>
-                        <div class="next-feeding-none">No feedings scheduled</div>
-                    {% endif %}
-                </section>
+            <noscript>
+                <p class="card noscript-note">PetFeedr needs JavaScript to show the dashboard. Turn it on for this site and reload.</p>
+            </noscript>
 
-                <!-- Today's Schedule (Timeline) -->
+            <div class="dashboard-content">
+                <section class="card next-feeding-card" id="card-next" aria-live="polite"></section>
+
                 <section class="card schedule-card">
-                    <div class="card-label">Today's Schedule</div>
-                    {% if schedules %}
-                        <div class="timeline" data-start="{{ timeline_start }}" data-end="{{ timeline_end }}">
-                            <div class="timeline-bar">
-                                <div class="timeline-now" id="timeline-now" aria-hidden="true"></div>
-                                {% for sched in schedules %}
-                                    {% set range = timeline_end - timeline_start %}
-                                    {% set pct = ((sched.time_minutes - timeline_start) / range * 100) if range > 0 else 50 %}
-                                    {% set status_text = {
-                                        'fed': 'Fed',
-                                        'late': 'Caught up ' ~ (sched.late_min ~ ' min ' if sched.late_min else '') ~ 'late',
-                                        'failed': 'Failed — check for a jam',
-                                        'missed': 'Missed',
-                                        'due': 'Due now',
-                                        'upcoming': 'Next' if sched.is_next else 'Upcoming'}[sched.status] %}
-                                    <div class="timeline-dot status-{{ sched.status }} {% if sched.is_past %}is-past{% endif %} {% if sched.is_next %}is-next{% endif %} portion-{{ sched.portion }}"
-                                         style="--dot-pos: {{ pct }}%;"
-                                         role="button" tabindex="0"
-                                         aria-label="{{ sched.actual_time_12h }}, {{ sched.portion }} portion, {{ status_text }}">
-                                        {% if sched.status == 'late' %}
-                                            <span class="dot-badge" aria-hidden="true">+{{ sched.late_min ~ 'm' if sched.late_min else 'late' }}</span>
-                                        {% elif sched.status == 'missed' %}
-                                            <span class="dot-badge" aria-hidden="true">!</span>
-                                        {% elif sched.status == 'failed' %}
-                                            <span class="dot-badge" aria-hidden="true">✕</span>
-                                        {% endif %}
-                                        <div class="timeline-tooltip">
-                                            {{ sched.actual_time_12h }}<br>
-                                            <span class="portion-{{ sched.portion }}">{{ sched.portion }}</span>
-                                            {% if sched.is_fixed %} 🔒{% endif %}<br>
-                                            <span class="tooltip-status">{{ status_text }}</span>
-                                        </div>
-                                    </div>
-                                {% endfor %}
-                            </div>
-                            <div class="timeline-hours">
-                                {% for hour in timeline_hours %}
-                                    <span class="timeline-hour-tick {% if hour.label %}has-label{% endif %}" style="left: {{ hour.pct }}%;"></span>
-                                    {% if hour.label %}
-                                        <span class="timeline-hour-label" style="left: {{ hour.pct }}%;">{{ hour.label }}</span>
-                                    {% endif %}
-                                {% endfor %}
-                            </div>
-                        </div>
-                    {% else %}
-                        <div class="empty-onboarding">
-                            <svg class="empty-icon" width="48" height="48" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <ellipse cx="24" cy="36" rx="18" ry="8"/>
-                                <path d="M6 36v-4c0-4.4 8.1-8 18-8s18 3.6 18 8v4"/>
-                                <circle cx="16" cy="12" r="4"/>
-                                <circle cx="32" cy="12" r="4"/>
-                                <path d="M16 8c-1-3-4-5-4-5"/>
-                                <path d="M32 8c1-3 4-5 4-5"/>
+                    <div class="card-label-row">
+                        <div class="card-label">Today's Schedule</div>
+                        <button type="button" class="card-action" id="edit-schedule-btn" hidden>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>
                             </svg>
-                            <h3>No feedings scheduled yet</h3>
-                            <p>Set up your pet's feeding times to get started.</p>
-                            <button class="btn btn-secondary" onclick="openAddFeeding()">Add First Feeding</button>
-                        </div>
-                    {% endif %}
+                            Edit schedule
+                        </button>
+                    </div>
+                    <div id="timeline-body"></div>
                     <div class="daily-summary">
                         <span class="daily-label">Daily Total</span>
-                        <span class="daily-value">
-                            {% if daily_total == 0 %}
-                                0 cups
-                            {% elif daily_total == daily_total | int %}
-                                {{ daily_total | int }} cup{% if daily_total != 1 %}s{% endif %}
-                            {% else %}
-                                {{ daily_total }} cups
-                            {% endif %}
-                        </span>
+                        <span class="daily-value" id="daily-total"></span>
                     </div>
                 </section>
 
-                <!-- Manual Feed -->
                 <section class="card feed-card">
-                    {% set no_extras = not manual.fits['small'] %}
                     <form action="/feed" method="post" class="feed-form">
                         <div class="feed-hold">
                             <svg class="hold-ring" viewBox="0 0 120 120" aria-hidden="true">
                                 <circle class="hold-ring-track" cx="60" cy="60" r="56"/>
                                 <circle class="hold-ring-fill" cx="60" cy="60" r="56" pathLength="100"/>
                             </svg>
-                            <button type="submit" class="feed-circle-btn" {% if no_extras %}disabled{% endif %}
-                                    aria-label="{% if no_extras %}No extra feeds left today{% else %}Press and hold to dispense food now{% endif %}">
+                            {# Disabled until feed.js takes over: if the JS never loads, a plain
+                               tap must not submit the form and dispense #}
+                            <button type="submit" class="feed-circle-btn" disabled aria-label="Press and hold to dispense food now">
                                 <span class="feed-circle-label" aria-hidden="true">Feed</span>
                             </button>
                         </div>
-                        <div class="hold-hint" aria-hidden="true">{% if no_extras %}Extras reset at midnight{% else %}Hold to feed{% endif %}</div>
-                        <div class="portion-segmented">
-                            {% for name, (cycles, desc) in portion_sizes.items() %}
-                                <label class="portion-segment" {% if not manual.fits[name] %}title="More than today's extras allow"{% endif %}>
-                                    <input type="radio" name="portion" value="{{ name }}"
-                                           {% if name == default_portion %}checked{% endif %}
-                                           {% if not manual.fits[name] %}disabled{% endif %}>
-                                    <span class="portion-segment-label portion-{{ name }}">{{ name[0] | upper }}</span>
-                                </label>
-                            {% endfor %}
-                        </div>
+                        <div class="hold-hint" aria-hidden="true">Hold to feed</div>
+                        <div class="portion-segmented" id="feed-portions" role="radiogroup" aria-label="Portion"></div>
                         <div class="portion-description" id="portion-desc"></div>
-                        <div class="extras-chip {% if no_extras %}is-empty{% endif %}"
-                             title="Manual feeds are capped at {{ manual.allowance | cups }} a day">
-                            {% if no_extras %}
-                                No extras left today
-                            {% else %}
-                                {{ manual.remaining | cups }} of extras left today
-                            {% endif %}
-                        </div>
+                        <div class="extras-chip" id="extras-chip"></div>
                     </form>
                 </section>
-                <script>const portionDescriptions = {{ portion_info | tojson }};</script>
 
-                <!-- Last 7 Days -->
                 <section class="card stats-card">
                     <div class="card-label-row">
                         <div class="card-label">Last 7 Days</div>
-                        {% if on_time.streak_days >= 2 %}
-                            <span class="streak-chip" title="{{ on_time.week_on_time }} of {{ on_time.week_total }} scheduled feeds on time this week">
-                                <span aria-hidden="true">🔥</span> {{ on_time.streak_days }}-day on-time streak
-                            </span>
-                        {% elif on_time.week_total %}
-                            <span class="streak-chip is-muted">{{ on_time.week_on_time }}/{{ on_time.week_total }} on time</span>
-                        {% endif %}
+                        <span id="streak-slot"></span>
                     </div>
-                    {% if rhythm.days | selectattr("marks") | list %}
-                        <div class="rhythm">
-                            <div class="rhythm-axis" aria-hidden="true">
-                                <span style="left: 0%;">12a</span><span style="left: 25%;">6a</span><span style="left: 50%;">12p</span><span style="left: 75%;">6p</span><span style="left: 100%;">12a</span>
-                            </div>
-                            {% for day in rhythm.days %}
-                                {% set fed = day.marks | selectattr('kind', 'in', ['fed', 'manual', 'late']) | list %}
-                                <div class="rhythm-row {% if day.is_today %}is-today{% endif %}"
-                                     data-date="{{ day.date }}" role="button" tabindex="0"
-                                     aria-label="{{ day.day_label }}, {{ day.total_cups | cups }}, {{ fed | length }} feedings{% for m in day.marks if m.kind not in ['fed', 'upcoming'] %}; {{ m.label }}{% endfor %}">
-                                    <span class="rhythm-day">{{ day.day_label }}</span>
-                                    <div class="rhythm-track" aria-hidden="true">
-                                        {% for g in rhythm.guides %}
-                                            <span class="rhythm-guide" style="--pct: {{ g.pct }}; --half: {{ g.half_width }};"></span>
-                                        {% endfor %}
-                                        {% if day.is_today %}<span class="rhythm-now" id="rhythm-now"></span>{% endif %}
-                                        {% for m in day.marks %}
-                                            {% if m.kind == 'late' %}
-                                                <span class="rhythm-late-tail" style="--from: {{ m.from_pct }}; --pct: {{ m.pct }};"></span>
-                                            {% endif %}
-                                            <span class="rhythm-mark mark-{{ m.kind }} {% if m.portion %}size-{{ m.portion }}{% endif %}"
-                                                  style="--pct: {{ m.pct }};" title="{{ m.label }}"></span>
-                                        {% endfor %}
-                                    </div>
-                                    <span class="rhythm-cups">{{ (day.total_cups | cups).split(' ')[0] }}</span>
-                                </div>
-                            {% endfor %}
-                        </div>
-                        <div class="rhythm-legend" aria-hidden="true">
-                            <span><i class="rhythm-mark mark-fed"></i>fed</span>
-                            <span><i class="rhythm-mark mark-manual"></i>manual</span>
-                            <span><i class="rhythm-mark mark-late"></i>late</span>
-                            <span><i class="rhythm-mark mark-missed"></i>missed</span>
-                            <span><i class="rhythm-mark mark-upcoming"></i>upcoming</span>
-                            <span><i class="rhythm-guide-key"></i>scheduled</span>
-                        </div>
-                        <div class="day-detail-panel" id="day-detail" style="display:none;" aria-live="polite"></div>
-                        <div class="stats-footer">
-                            {% if week_summary %}
-                                <span class="week-summary">{{ week_summary }}</span>
-                            {% endif %}
-                            {% if consumption %}
-                                <span class="consumption-rate" title="Estimated from last 7 days">
-                                    ≈ {{ consumption.daily_cups | cups }}/day · {{ '%g' | format(consumption.monthly_lbs) }} lbs/mo
-                                </span>
-                            {% endif %}
-                        </div>
-                    {% else %}
-                        <p class="empty-state">No feeding data yet</p>
-                    {% endif %}
+                    <div id="stats-body"></div>
+                    <div class="day-detail-panel" id="day-detail" hidden aria-live="polite"></div>
+                    <div class="stats-footer" id="stats-footer"></div>
                 </section>
 
-                <!-- Hopper -->
                 <section class="card hopper-card">
                     <div class="card-label">Hopper</div>
-                    {% if hopper.learning %}
-                        <div class="hopper-learning">
-                            <span class="hopper-amount">
-                                {{ hopper.cups_since_refill }} cup{{ 's' if hopper.cups_since_refill != 1 }}
-                            </span>
-                            dispensed since refill on {{ hopper.last_refill_label }}
-                        </div>
-                        <p class="setting-description">Capacity is learned from refills — when you top it up, tap "I refilled it" and give a rough guess of what was left.</p>
-                    {% else %}
-                        {% set pct = (hopper.level * 100) | round | int %}
-                        {% set low = hopper.level <= 0.15 %}
-                        <div class="hopper-visual">
-                            <svg class="hopper-svg {% if low %}is-low{% endif %}" viewBox="0 0 64 84" role="img" aria-label="Hopper about {{ pct }} percent full">
-                                <defs>
-                                    <clipPath id="hopper-clip"><path d="M6 4 H58 L45 54 H19 Z"/></clipPath>
-                                    <pattern id="kibble-pattern" width="9" height="7" patternUnits="userSpaceOnUse">
-                                        <ellipse cx="2.5" cy="2" rx="2" ry="1.5" class="kibble-dot"/>
-                                        <ellipse cx="7" cy="5.5" rx="2" ry="1.5" class="kibble-dot"/>
-                                    </pattern>
-                                </defs>
-                                <g clip-path="url(#hopper-clip)">
-                                    <rect class="hopper-svg-empty" x="0" y="0" width="64" height="60"/>
-                                    <rect class="hopper-svg-fill" x="0" y="{{ 4 + 50 * (1 - hopper.level) }}" width="64" height="{{ 50 * hopper.level + 1 }}"/>
-                                    <rect x="0" y="{{ 4 + 50 * (1 - hopper.level) }}" width="64" height="{{ 50 * hopper.level + 1 }}" fill="url(#kibble-pattern)"/>
-                                </g>
-                                <path class="hopper-svg-outline" d="M6 4 H58 L45 54 H19 Z"/>
-                                <rect class="hopper-svg-spout" x="27" y="54" width="10" height="9" rx="2"/>
-                                <path class="hopper-svg-bowl" d="M14 72 H50 Q48 81 32 81 Q16 81 14 72 Z"/>
-                            </svg>
-                            <div class="hopper-info">
-                                <div class="hopper-headline">~{{ pct }}% full{% if hopper.lbs_left is not none %} <span class="hopper-lbs">· ~{{ '%g' % hopper.lbs_left }} lb</span>{% endif %}</div>
-                                {% if hopper.refill_by_label %}
-                                    <div class="hopper-refill-by {% if hopper.refill_by_label == 'today' %}is-urgent{% endif %}">Refill by {{ hopper.refill_by_label }}</div>
-                                    <div class="hopper-sub">~{{ hopper.days_left }} day{{ 's' if hopper.days_left != 1 }} of food · empty around {{ hopper.empty_label }}</div>
-                                {% endif %}
-                                <div class="hopper-sub">Holds {% if hopper.capacity_lbs %}~{{ '%g' % hopper.capacity_lbs }} lb ({{ (hopper.capacity_lbs * 16) | round | int }} oz), {% endif %}~{{ hopper.capacity }} cups</div>
-                            </div>
-                        </div>
-                    {% endif %}
+                    <div id="hopper-body"></div>
                     <div class="hopper-refill">
                         <button type="button" class="btn btn-secondary" id="refill-toggle">I refilled it</button>
                         <form action="/refill" method="post" class="refill-form" hidden>
                             <label for="remaining_pct">How full was it before you refilled?</label>
                             <select id="remaining_pct" name="remaining_pct">
-                                {% for val, name in [(0, 'Empty'), (10, '~10%'), (25, '~25%'), (50, '~50%'), (75, '~75%')] %}
-                                    <option value="{{ val }}"{% if val == hopper.refill_default %} selected{% endif %}>{{ name }}</option>
-                                {% endfor %}
+                                <option value="0">Empty</option>
+                                <option value="10">~10%</option>
+                                <option value="25">~25%</option>
+                                <option value="50">~50%</option>
+                                <option value="75">~75%</option>
                             </select>
                             <label for="lbs_added">Pounds added (optional)</label>
                             <input type="number" id="lbs_added" name="lbs_added" min="0.1" max="50" step="0.1" inputmode="decimal" placeholder="e.g. 7">
@@ -390,20 +129,43 @@
                 </section>
             </div>
 
-            <footer class="status-footer">
-            <span class="footer-item">v{{ app_version }}</span>
-            <span class="footer-divider">·</span>
-            <span class="footer-item {% if simulation_mode %}footer-sim{% endif %}">
-                {{ "Simulation" if simulation_mode else "Live" }}
-            </span>
-            {% if last_feeding %}
-                <span class="footer-divider">·</span>
-                <span class="footer-item">Last fed: {{ last_feeding.date }} at {{ last_feeding.time }}</span>
-            {% endif %}
-            </footer>
+            <footer class="status-footer" id="status-footer"></footer>
         </main>
 
+        <!-- Schedule editor: bottom sheet on phones, centered panel on desktop.
+             Native <dialog> + showModal() brings focus trapping, Esc-to-close
+             and the top-layer backdrop for free. -->
+        <dialog class="sheet" id="schedule-sheet" aria-labelledby="schedule-sheet-title">
+            <div class="sheet-grabber" aria-hidden="true"></div>
+            <div class="sheet-header">
+                <h2 id="schedule-sheet-title">Feeding Schedule</h2>
+                <button type="button" class="sheet-close" data-close-sheet aria-label="Close schedule editor">×</button>
+            </div>
+            <div class="sheet-body">
+                <ul class="sched-list" id="sched-list"></ul>
+                <p class="setting-description sched-legend" id="sched-legend" hidden>±30m varies the time a little each day; Fixed always feeds on the dot.</p>
+
+                <section class="sheet-add" id="sheet-add">
+                    <h3>Add a feeding</h3>
+                    <form action="/add" method="post" class="add-form">
+                        <div class="add-row">
+                            <label class="sr-only" for="feeding_time">Time</label>
+                            <input type="time" id="feeding_time" name="feeding_time" required>
+                            <div class="portion-segmented is-compact" id="add-portions" role="radiogroup" aria-label="Portion"></div>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" name="randomize" checked>
+                            <span class="toggle-slider"></span>
+                            <span class="toggle-label-text">Vary by ±30 min daily</span>
+                        </label>
+                        <button type="submit" class="btn btn-primary">Add Feeding</button>
+                    </form>
+                </section>
+            </div>
+        </dialog>
+
         <div id="toast-container" aria-live="polite"></div>
-        <script src="{{ url_for('static', filename='main.js') }}"></script>
+        <script id="initial-state" type="application/json">{{ initial_state | tojson }}</script>
+        <script type="module" src="{{ url_for('static', filename='js/app.js') }}"></script>
     </body>
 </html>

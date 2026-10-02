@@ -3,20 +3,18 @@
 import os
 import time
 from datetime import datetime
+from pathlib import Path
 from urllib.parse import urlparse
-from flask import Flask, redirect, request, render_template, jsonify
+from flask import Flask, request, render_template, jsonify
 
 from feeder_core import feed_pet, STATE_LOCK, log, setup_logging
 from feeding_stats import day_feedings, PORTION_CUPS
 import manual_limit
 from servo_controller import PORTION_SIZES, DEFAULT_PORTION
-from DRV8825 import SIMULATION_MODE
-from responses import wants_json, error_response
+from responses import wants_json, error_response, success_response
 from schedule_routes import schedule_bp
-import dashboard
 import hopper
-
-APP_VERSION = "1.4.0"
+import view_state
 MAX_REFILL_LBS = 50  # sanity bound — a typo like 700 would wreck the cups-per-lb median
 
 # Cooldown between manual feeds (limits live in manual_limit.py). Monotonic
@@ -28,6 +26,10 @@ WEB_PORT = int(os.environ.get('PETFEEDR_PORT', 5000))
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', os.urandom(24).hex())
+# Revalidate static files on every load (a 304 on the LAN). Without it,
+# browsers heuristically cache the JS modules and could keep running the
+# previous release after a deploy
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 app.register_blueprint(schedule_bp)
 
 
@@ -45,29 +47,19 @@ def reject_cross_origin_posts():
     return None
 
 
-@app.template_filter('cups')
-def _cups_filter(value):
-    """0.75 → "¾ cup", 1.25 → "1¼ cups" — kitchen fractions read faster than decimals."""
-    quarters = int(round(float(value) * 4))
-    whole, frac = divmod(quarters, 4)
-    text = (str(whole) if whole else '') + ['', '¼', '½', '¾'][frac] or '0'
-    return f"{text} cup{'' if quarters <= 4 and quarters != 0 else 's'}"
-
-
-# Custom Jinja2 filter for formatting datetime objects
-@app.template_filter('strftime')
-def _jinja2_filter_datetime(value, format=None):
-    return value
-
-
 @app.route('/')
 def index():
+    """The page is a shell plus the first state snapshot; static/js renders
+    every card from it and keeps it current without reloading."""
     return render_template('index.html',
-                           portion_sizes=PORTION_SIZES,
-                           default_portion=DEFAULT_PORTION,
-                           simulation_mode=SIMULATION_MODE,
-                           app_version=APP_VERSION,
-                           **dashboard.index_context())
+                           initial_state=view_state.build(),
+                           asset_version=view_state.ASSET_VERSION)
+
+
+@app.route('/api/state')
+def api_state():
+    """Current dashboard state. Polled by the open page; read-only."""
+    return jsonify({'success': True, 'data': view_state.build()})
 
 
 @app.route('/api/day-detail/<date_str>')
@@ -118,11 +110,9 @@ def trigger_feeding():
         if ok:
             _last_manual_feed = time.monotonic()
 
-    if wants_json():
-        if ok:
-            return jsonify({'success': True, 'message': f'Dispensed {portion} portion'})
-        return jsonify({'success': False, 'message': 'Feeding failed — check the feeder'}), 500
-    return redirect('/')
+    if ok:
+        return success_response(f'Dispensed {portion} portion')
+    return error_response('Feeding failed — check the feeder', 500)
 
 
 @app.route('/refill', methods=['POST'])
@@ -163,16 +153,20 @@ def refill():
         message = f'Refill recorded — hopper holds ~{capacity} cups'
     else:
         message = 'Refill recorded'
-    if wants_json():
-        return jsonify({'success': True, 'message': message})
-    return redirect('/')
+    return success_response(message)
 
 
 @app.route('/sw.js')
 def service_worker():
     """Serve service worker from root scope."""
-    return app.send_static_file('sw.js'), 200, {
+    # The asset version is stamped into the worker so every deploy changes
+    # its bytes: browsers install the new worker and drop the old cache
+    # without anyone bumping a cache name by hand
+    body = (Path(app.static_folder) / 'sw.js').read_text().replace(
+        '__ASSET_VERSION__', view_state.ASSET_VERSION)
+    return body, 200, {
         'Content-Type': 'application/javascript',
+        'Cache-Control': 'no-cache',
         'Service-Worker-Allowed': '/'
     }
 

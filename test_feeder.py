@@ -205,6 +205,15 @@ class TestTotals(unittest.TestCase):
             feeding_stats.parse_weekly_stats(lines=["\n"])))
 
 
+def _api_state(web_interface):
+    """GET /api/state and return its data payload."""
+    resp = web_interface.app.test_client().get('/api/state')
+    assert resp.status_code == 200, resp.status_code
+    body = resp.get_json()
+    assert body['success'], body
+    return body['data']
+
+
 class TempCwd(unittest.TestCase):
     """Run in a scratch directory so tests never touch the repo's runtime files."""
 
@@ -378,22 +387,21 @@ class TestHopper(TempCwd):
         import web_interface
         hopper.record_dispense(22.96)
         hopper.record_refill(12.5, lbs_added=7)
-        html = web_interface.app.test_client().get('/').get_data(as_text=True)
-        self.assertIn('Holds ~8 lb (128 oz), ~26.24 cups', html)
-        self.assertIn('~100% full <span class="hopper-lbs">· ~8 lb</span>', html)
+        card = _api_state(web_interface)['hopper']
+        self.assertEqual(card['capacity_label'], 'Holds ~8 lb (128 oz), ~26.24 cups')
+        self.assertEqual((card['headline'], card['lbs_label']), ('~100% full', '· ~8 lb'))
         hopper.record_dispense(13.12)  # half of 26.24 cups
-        html = web_interface.app.test_client().get('/').get_data(as_text=True)
-        self.assertIn('~50% full <span class="hopper-lbs">· ~4 lb</span>', html)
+        card = _api_state(web_interface)['hopper']
+        self.assertEqual((card['headline'], card['lbs_label']), ('~50% full', '· ~4 lb'))
 
     def test_index_shows_cups_only_when_never_weighed(self):
         import hopper
         import web_interface
         hopper.record_dispense(10)
         hopper.record_refill(25)
-        html = web_interface.app.test_client().get('/').get_data(as_text=True)
-        self.assertIn('Holds ~13.33 cups', html)
-        self.assertNotIn(' oz)', html)
-        self.assertNotIn('hopper-lbs', html)
+        card = _api_state(web_interface)['hopper']
+        self.assertEqual(card['capacity_label'], 'Holds ~13.33 cups')
+        self.assertIsNone(card['lbs_label'])
 
     def test_weighed_refill_after_trivial_consumption_learns_nothing(self):
         import hopper
@@ -451,13 +459,11 @@ class TestHopper(TempCwd):
         hopper.record_dispense(9.0)
         hopper.record_refill(10)     # capacity ~10 cups
         hopper.record_dispense(4.0)  # level 0.6 → nearest choice is 50
-        html = web_interface.app.test_client().get('/').data.decode()
-        self.assertIn('<option value="50" selected>', html)
+        self.assertEqual(_api_state(web_interface)['hopper']['refill_default'], 50)
 
     def test_index_refill_guess_defaults_to_10_while_learning(self):
         import web_interface
-        html = web_interface.app.test_client().get('/').data.decode()
-        self.assertIn('<option value="10" selected>', html)
+        self.assertEqual(_api_state(web_interface)['hopper']['refill_default'], 10)
 
     def test_refill_route_validates_percentage(self):
         import web_interface
@@ -746,6 +752,96 @@ class TestScheduleRoutes(TempCwd):
         self.client.post('/delete', data={'base_time': '12:00'}, headers=self.json)
         self.assertEqual(self._file(), "08:00,large,fixed\n")
 
+    def test_edits_return_fresh_state(self):
+        resp = self.client.post('/add', data={'feeding_time': '23:58', 'portion': 'large'},
+                                headers=self.json)
+        rows = resp.get_json()['state']['schedule']
+        self.assertEqual(rows, [{'base_time': '23:58', 'time': '11:58 PM',
+                                 'portion': 'large', 'is_fixed': True}])
+        resp = self.client.post('/update_portion', data={'base_time': '23:58', 'portion': 'small'},
+                                headers=self.json)
+        self.assertEqual(resp.get_json()['state']['schedule'][0]['portion'], 'small')
+        resp = self.client.post('/delete', data={'base_time': '23:58'}, headers=self.json)
+        self.assertEqual(resp.get_json()['state']['schedule'], [])
+
+    def test_edit_still_succeeds_when_state_snapshot_fails(self):
+        # The write landed; a broken snapshot must not report it as failed
+        with patch('responses.view_state.build', side_effect=RuntimeError('boom')):
+            resp = self.client.post('/add', data={'feeding_time': '23:58'}, headers=self.json)
+        body = resp.get_json()
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(body['success'])
+        self.assertNotIn('state', body)
+        self.assertIn('23:58', self._file())
+
+    def test_form_posts_without_json_still_redirect(self):
+        resp = self.client.post('/add', data={'feeding_time': '23:58'})
+        self.assertEqual(resp.status_code, 302)
+
+    def test_api_state_is_json_safe_and_read_only(self):
+        import web_interface
+        with open('feeding_schedules.txt', 'w') as f:
+            f.write("08:00,small,fixed\n")
+        before = self._file()
+        state = _api_state(web_interface)
+        self.assertEqual(self._file(), before)
+        self.assertEqual(state['schedule'][0]['time'], '8:00 AM')
+        self.assertEqual([p['letter'] for p in state['portions']], ['S', 'M', 'L'])
+        self.assertEqual(state['asset_version'], web_interface.view_state.ASSET_VERSION)
+
+    def test_index_embeds_initial_state_and_sw_is_version_stamped(self):
+        import web_interface
+        html = self.client.get('/').get_data(as_text=True)
+        self.assertIn('id="initial-state"', html)
+        sw = self.client.get('/sw.js').get_data(as_text=True)
+        self.assertIn(web_interface.view_state.ASSET_VERSION, sw)
+        self.assertNotIn('__ASSET_VERSION__', sw)
+
+
+def _load_check_live():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        'check_live', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ops', 'check_live.py'))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+class TestShipLiveCheck(TempCwd):
+    """ship.sh's simulation guard, run against real /api/state output — so a
+    change to the state shape fails here instead of blinding the smoke test."""
+
+    def setUp(self):
+        super().setUp()
+        self.check = _load_check_live()
+
+    def _state_body(self, simulation):
+        import web_interface
+        with patch('view_state.SIMULATION_MODE', simulation):
+            return web_interface.app.test_client().get('/api/state').get_data(as_text=True)
+
+    def test_live_state_passes(self):
+        ok, reason = self.check.state_is_live(self._state_body(False))
+        self.assertTrue(ok, reason)
+
+    def test_simulation_state_fails(self):
+        ok, _ = self.check.state_is_live(self._state_body(True))
+        self.assertFalse(ok)
+
+    def test_state_fails_closed_on_anything_unproven(self):
+        for body in ['', 'not json', '{}', '{"success": true, "data": {}}',
+                     '{"success": false, "data": {"app": {"simulation": false}}}',
+                     '{"success": true, "data": {"app": {"simulation": "false"}}}',
+                     '{"success": true, "data": {"app": {"simulation": null}}}']:
+            self.assertFalse(self.check.state_is_live(body)[0], body)
+
+    def test_env_check(self):
+        self.assertTrue(self.check.env_is_live('READABLE\n')[0])
+        self.assertTrue(self.check.env_is_live('READABLE\nPETFEEDR_SIMULATE=false\n')[0])
+        self.assertFalse(self.check.env_is_live('READABLE\nPETFEEDR_SIMULATE=True\n')[0])
+        self.assertFalse(self.check.env_is_live('')[0])  # couldn't read: fail closed
+        self.assertFalse(self.check.env_is_live('PETFEEDR_SIMULATE=false\n')[0])
+
 
 class TestLearnedCupsPerLb(unittest.TestCase):
     def test_consumption_uses_learned_ratio(self):
@@ -784,6 +880,14 @@ class TestManualFeedGuards(TempCwd):
             resp = self.client.post('/feed', data={'portion': 'small'}, headers=self.json)
         self.assertEqual(resp.status_code, 200)
         mock_feed.assert_called_once()
+        self.assertIn('feed', resp.get_json()['state'])  # UI updates in place from this
+
+    def test_failed_dispense_is_an_error_without_state(self):
+        with patch('web_interface.feed_pet', return_value=False):
+            resp = self.client.post('/feed', data={'portion': 'small'}, headers=self.json)
+        self.assertEqual(resp.status_code, 500)
+        self.assertFalse(resp.get_json()['success'])
+        self.assertNotIn('state', resp.get_json())
 
     def test_feed_over_allowance_refused_without_dispensing(self):
         self._log_manual('medium', 1)  # 0.5 used; a medium would make 1.0 > 0.75
@@ -1162,9 +1266,9 @@ class TestDashboardExtras(TempCwd):
         self.assertEqual((st['used'], st['remaining']), (0.25, 0.5))
         self.assertEqual(st['fits'], {'small': True, 'medium': True, 'large': False})
 
-    def test_cups_filter(self):
-        import web_interface
-        f = web_interface._cups_filter
+    def test_cups_formatter(self):
+        import view_state
+        f = view_state.cups
         self.assertEqual([f(0), f(0.25), f(0.5), f(1), f(1.25), f(2)],
                          ['0 cups', '¼ cup', '½ cup', '1 cup', '1¼ cups', '2 cups'])
 
@@ -1195,12 +1299,15 @@ class TestDashboardExtras(TempCwd):
             for kind, slot, extra in (('dispense', '00:01', {}), ('dispense', '00:02', {'late_by_min': 7}),
                                       ('failure', '00:03', {})):
                 f.write(json.dumps({'ts': f'{t}T{slot}:01', 'event': kind, 'scheduled_for': slot, **extra}) + '\n')
-        html = web_interface.app.test_client().get('/').get_data(as_text=True)
-        for status in ('status-fed', 'status-late', 'status-failed', 'status-missed', 'status-upcoming'):
-            self.assertIn(status, html)
-        self.assertIn('+7m', html)
-        for mark in ('mark-fed', 'mark-late', 'mark-failed', 'mark-upcoming', 'rhythm-guide'):
-            self.assertIn(mark, html)
+        state = _api_state(web_interface)
+        slots_by_key = {s['key']: s for s in state['timeline']['slots']}
+        self.assertEqual([slots_by_key[k]['status'] for k in slots],
+                         ['fed', 'late', 'failed', 'missed', 'upcoming'])
+        self.assertEqual(slots_by_key['00:02']['badge'], '+7m')
+        self.assertEqual(slots_by_key['00:03']['status_text'], 'Failed — check for a jam')
+        today_marks = {m['kind'] for m in state['stats']['days'][-1]['marks']}
+        self.assertEqual(today_marks, {'fed', 'late', 'failed', 'upcoming'})
+        self.assertEqual(len(state['stats']['guides']), len(slots))
 
 
 class TestScheduledFeedIdempotent(TempCwd):
