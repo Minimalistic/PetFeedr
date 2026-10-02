@@ -430,8 +430,14 @@ body {
     align-items: center;
 }
 
+/* Solid, not faded: at 0.8 opacity this small label dropped below 4.5:1 */
 .next-feeding-card .card-label {
-    color: rgba(255,255,255,0.8);
+    color: white;
+}
+
+/* Dark theme's brighter teal (#00acc1) gave white text 2.7:1; these give 5.4–8.7:1 */
+[data-theme="dark"] .next-feeding-card:not(.all-fed) {
+    background: linear-gradient(135deg, #00767f 0%, #00545c 100%);
 }
 
 .next-feeding-time {
@@ -490,21 +496,27 @@ body {
 
 .randomized-note {
     font-size: 0.8rem;
-    opacity: 0.8;
     font-style: italic;
 }
 
-.next-feeding-none {
-    opacity: 0.7;
-}
-
-/* All-Fed State */
+/* All-Fed State — light keeps the sunny gradient but takes dark text (white
+   on it was 1.8:1); dark deepens the gradient so white text clears 4.9:1 */
 .next-feeding-card.all-fed {
     background: linear-gradient(135deg, #f8b400 0%, #f08080 100%);
+    color: #3b2200;
+}
+
+.next-feeding-card.all-fed .card-label {
+    color: #3b2200;
 }
 
 [data-theme="dark"] .next-feeding-card.all-fed {
-    background: linear-gradient(135deg, #c68a00 0%, #c06060 100%);
+    background: linear-gradient(135deg, #a85d00 0%, #9c3f53 100%);
+    color: white;
+}
+
+[data-theme="dark"] .next-feeding-card.all-fed .card-label {
+    color: white;
 }
 
 .all-fed-content {
@@ -525,7 +537,6 @@ body {
 
 .all-fed-subtext {
     font-size: 0.9rem;
-    opacity: 0.85;
 }
 
 /* Schedule Card */
@@ -769,6 +780,11 @@ body {
 .feed-circle-btn:hover {
     transform: scale(1.05);
     box-shadow: 0 8px 28px rgba(0,131,143,0.5);
+}
+
+/* Same 2.7:1 problem as the Next card in dark mode; #00767f gives "FEED" 5.4:1 */
+[data-theme="dark"] .feed-circle-btn:not(:disabled) {
+    background: #00767f;
 }
 
 .feed-circle-btn:active {
