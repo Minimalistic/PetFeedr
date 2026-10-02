@@ -92,6 +92,9 @@
 
 html {
     font-size: 16px;
+    /* Solid page color on the root: it fills the iOS status-bar strip and
+       overscroll areas, which the body's gradient doesn't reach */
+    background-color: var(--color-bg);
 }
 
 body {
@@ -300,6 +303,11 @@ body {
     margin: 0 auto;
     padding: clamp(0.5rem, 1vw, 0.75rem) clamp(0.75rem, 3vw, 3rem);
     padding-bottom: 0;
+    /* Clear the status bar / Dynamic Island (viewport-fit=cover) and, in
+       landscape, the notch side; env() is 0 everywhere else */
+    padding-top: calc(clamp(0.5rem, 1vw, 0.75rem) + env(safe-area-inset-top));
+    padding-left: max(clamp(0.75rem, 3vw, 3rem), env(safe-area-inset-left));
+    padding-right: max(clamp(0.75rem, 3vw, 3rem), env(safe-area-inset-right));
     min-height: 100vh;
     min-height: 100dvh;
     display: flex;
@@ -1159,7 +1167,7 @@ body {
 /* ===== Toasts ===== */
 #toast-container {
     position: fixed;
-    bottom: 1.5rem;
+    bottom: calc(1.5rem + env(safe-area-inset-bottom));
     left: 50%;
     transform: translateX(-50%);
     z-index: 1000;
