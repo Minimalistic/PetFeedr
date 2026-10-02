@@ -1259,34 +1259,7 @@ body {
         animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;
     }
-    /* The rule above doesn't reach view-transition pseudo-elements */
-    ::view-transition-group(*),
-    ::view-transition-old(*),
-    ::view-transition-new(*) {
-        animation: none !important;
-    }
 }
-
-/* ===== Page Refresh Transitions ===== */
-/* Cross-document view transitions: every refresh (refreshPage() in main.js)
-   cross-fades instead of flashing, and named cards morph to their new size.
-   Browsers without support (Firefox, Safari < 18.2) just navigate as before.
-   Note: this only fires for push/replace navigations, never location.reload(). */
-@view-transition {
-    navigation: auto;
-}
-
-::view-transition-group(*) {
-    animation-duration: 0.3s;
-    animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
-}
-
-.next-feeding-card { view-transition-name: card-next; }
-.schedule-card     { view-transition-name: card-schedule; }
-.feed-card         { view-transition-name: card-feed; }
-.stats-card        { view-transition-name: card-stats; }
-.hopper-card       { view-transition-name: card-hopper; }
-.status-footer     { view-transition-name: status-footer; }
 
 /* ===== Status Footer ===== */
 .status-footer {
@@ -1651,9 +1624,6 @@ body {
     .sheet[open] { transform: translateY(100%); }
 }
 
-/* Reopened after a refresh: already in place, the view transition handles it */
-.sheet.no-enter { transition: none; }
-
 .sheet::backdrop {
     background: rgba(0, 0, 0, 0);
     transition:
@@ -1840,4 +1810,33 @@ body:has(.sheet[open]) {
 
 @media (prefers-reduced-motion: reduce) {
     .sheet, .sheet::backdrop { transition: none; }
+}
+
+/* ===== Live updates ===== */
+/* The kibble level slides to its new height (hopper.js sets the transform) */
+.hopper-fill {
+    transition: transform 0.9s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+.timeline-dot {
+    transition: background-color 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;
+}
+
+.day-detail-message {
+    text-align: center;
+    color: var(--color-text-muted);
+}
+
+.footer-offline {
+    color: var(--color-danger);
+    font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .hopper-fill { transition: none; }
+}
+
+.noscript-note {
+    margin-bottom: 0.75rem;
+    text-align: center;
 }

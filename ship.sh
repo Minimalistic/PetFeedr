@@ -60,9 +60,20 @@ smoke() {
     [ "$code" = "200" ] || fail "Dashboard returned HTTP $code"
     echo "  dashboard 200"
 
-    # Simulation on the Pi means the motor isn't driven — the worst silent failure
-    pi "grep -q 'footer-sim' /tmp/ship-idx.html" >/dev/null && fail "Pi is in SIMULATION mode"
-    echo "  live mode (not simulation)"
+    # Simulation on the Pi means the motor isn't driven — the worst silent failure.
+    # Two independent checks, both fail-closed (logic + tests: ops/check_live.py).
+    # 1) What the app reports. curl -f: a 404 (prod older than /api/state) or any
+    #    error yields an empty body, which the checker rejects
+    local verdict
+    verdict=$(pi "curl -sf localhost:5000/api/state" | python3 ops/check_live.py --state) \
+        || fail "Simulation check (state API): $verdict — if prod predates 1.5.0 this is expected before the first deploy"
+    echo "  $verdict"
+    # 2) The cause itself: the override in the running service's environment.
+    #    Only the PETFEEDR_SIMULATE line leaves the Pi — the environ holds secrets
+    verdict=$(pi 'P=$(systemctl show -p MainPID --value petfeedr); [ "${P:-0}" -gt 0 ] && [ -r /proc/$P/environ ] && { echo READABLE; tr "\0" "\n" < /proc/$P/environ | grep "^PETFEEDR_SIMULATE=" || true; }' \
+        | python3 ops/check_live.py --env) \
+        || fail "Simulation check (service env): $verdict"
+    echo "  $verdict"
 
     local since
     since=$(pi "systemctl show petfeedr -p ActiveEnterTimestamp --value" | tail -1)

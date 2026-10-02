@@ -5,11 +5,11 @@ then resyncs the job registry so the edit takes effect immediately.
 """
 
 from datetime import datetime
-from flask import Blueprint, redirect, request, jsonify
+from flask import Blueprint, request
 
 from feeder_core import (load_todays_schedule, save_todays_schedule,
                          apply_random_offset, resync_today, STATE_LOCK, log)
-from responses import wants_json, error_response
+from responses import error_response, success_response
 from servo_controller import PORTION_SIZES, DEFAULT_PORTION
 import schedule_store
 
@@ -75,9 +75,7 @@ def add_job():
         else:
             log.info(f"Added feeding time: {feeding_time_12h} → {actual_time_12h} ({portion} portion)")
 
-        if wants_json():
-            return jsonify({'success': True, 'message': f'Added {feeding_time_12h} feeding'})
-        return redirect('/')
+        return success_response(f'Added {feeding_time_12h} feeding')
 
     except Exception as e:
         log.error(f"Error adding feeding time: {e}")
@@ -97,9 +95,7 @@ def delete_job():
             resync_today()
 
         log.info(f"Deleted feeding time: {base_time}")
-        if wants_json():
-            return jsonify({'success': True, 'message': 'Feeding deleted'})
-        return redirect('/')
+        return success_response('Feeding deleted')
     except Exception as e:
         log.error(f"Error deleting feeding time: {e}")
         return error_response('Error deleting feeding time', 500)
@@ -120,9 +116,7 @@ def toggle_fixed():
             replace_today_entry(base_time, target['portion'], target['is_fixed'])
 
         status = 'fixed' if target['is_fixed'] else 'randomized'
-        if wants_json():
-            return jsonify({'success': True, 'message': f'Feeding set to {status}'})
-        return redirect('/')
+        return success_response(f'Feeding set to {status}')
     except Exception as e:
         log.error(f"Error toggling fixed status: {e}")
         return error_response('Error toggling fixed status', 500)
@@ -155,9 +149,7 @@ def update_portion():
             resync_today()
 
         log.info(f"Updated portion for {base_time} to {new_portion}")
-        if wants_json():
-            return jsonify({'success': True, 'message': f'Portion updated to {new_portion}'})
-        return redirect('/')
+        return success_response(f'Portion updated to {new_portion}')
     except Exception as e:
         log.error(f"Error updating portion: {e}")
         return error_response('Error updating portion', 500)
