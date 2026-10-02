@@ -1446,7 +1446,34 @@ body {
         animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;
     }
+    /* The rule above doesn't reach view-transition pseudo-elements */
+    ::view-transition-group(*),
+    ::view-transition-old(*),
+    ::view-transition-new(*) {
+        animation: none !important;
+    }
 }
+
+/* ===== Page Refresh Transitions ===== */
+/* Cross-document view transitions: every refresh (refreshPage() in main.js)
+   cross-fades instead of flashing, and named cards morph to their new size.
+   Browsers without support (Firefox, Safari < 18.2) just navigate as before.
+   Note: this only fires for push/replace navigations, never location.reload(). */
+@view-transition {
+    navigation: auto;
+}
+
+::view-transition-group(*) {
+    animation-duration: 0.3s;
+    animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+}
+
+.next-feeding-card { view-transition-name: card-next; }
+.schedule-card     { view-transition-name: card-schedule; }
+.feed-card         { view-transition-name: card-feed; }
+.stats-card        { view-transition-name: card-stats; }
+.hopper-card       { view-transition-name: card-hopper; }
+.status-footer     { view-transition-name: status-footer; }
 
 /* ===== Status Footer ===== */
 .status-footer {

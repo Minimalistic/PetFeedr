@@ -154,6 +154,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initRhythm();
     initAjaxForms();
     initHoldToFeed();
+    restoreScroll();
 
     // Register service worker for PWA
     if ('serviceWorker' in navigator) {
@@ -257,6 +258,29 @@ function confirmAction(button, onConfirm) {
     button.dataset.confirmTimer = timer;
 }
 
+// ===== Page Refresh =====
+// location.replace instead of reload(): reloads never get a cross-document
+// view transition, same-URL replaces do (see @view-transition in styles.css).
+// A replace doesn't restore scroll position like a reload does, so carry it over.
+const SCROLL_KEY = 'petfeedr-scroll-y';
+
+function refreshPage() {
+    try { sessionStorage.setItem(SCROLL_KEY, String(window.scrollY)); } catch {}
+    window.location.replace(window.location.href);
+}
+
+// Called at the end of the DOMContentLoaded setup: after initCountdown has
+// inserted its line (or the restore lands that many px off), and before
+// first paint so the transition's "new" snapshot is already scrolled
+function restoreScroll() {
+    let y = null;
+    try {
+        y = sessionStorage.getItem(SCROLL_KEY);
+        sessionStorage.removeItem(SCROLL_KEY);
+    } catch {}
+    if (y !== null) window.scrollTo(0, Number(y));
+}
+
 // ===== AJAX Form Submission =====
 // Resolves true on success so callers can celebrate only real successes
 async function submitForm(form, { reloadDelay = 500 } = {}) {
@@ -271,7 +295,7 @@ async function submitForm(form, { reloadDelay = 500 } = {}) {
         const data = await response.json();
         if (data.success) {
             showToast(data.message, 'success');
-            setTimeout(() => window.location.reload(), reloadDelay);
+            setTimeout(refreshPage, reloadDelay);
             return true;
         }
         showToast(data.message || 'Something went wrong', 'error');
@@ -485,7 +509,12 @@ function initCountdown() {
             newText = 'any moment now';
         }
 
-        if (newText !== lastText) {
+        if (!lastText) {
+            // First tick fills in synchronously — nothing to fade from, and an
+            // empty line here would shift the layout under restoreScroll()
+            countdownEl.textContent = newText;
+            lastText = newText;
+        } else if (newText !== lastText) {
             countdownEl.classList.add('updating');
             setTimeout(() => {
                 countdownEl.textContent = newText;
@@ -504,7 +533,7 @@ setInterval(() => {
     const tag = document.activeElement?.tagName;
     if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
     if (feedHoldActive) return;  // never yank the page out from under a hold
-    window.location.reload();
+    refreshPage();
 }, 60000);
 
 // Close sidebar on escape key
