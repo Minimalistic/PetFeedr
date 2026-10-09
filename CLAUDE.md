@@ -14,7 +14,7 @@ No database — schedules and logs are flat files.
 - **Scheduling**: `schedule` library (in-process)
 - **Hardware**: DRV8825 stepper motor driver via `RPi.GPIO`
 - **Simulation mode**: auto-enabled when `RPi.GPIO` is unavailable off a Pi (dev on Mac); on a Pi that is a hard error
-- **Frontend**: Vanilla JS PWA — `static/main.js`, `static/sw.js`, `static/manifest.json`
+- **Frontend**: Vanilla JS PWA — `static/js/` (`app.js` entry; `api.js`, `store.js`, `dom.js`, `cards/`…), `static/sw.js`, `static/manifest.json`
 
 ## Key Files
 
