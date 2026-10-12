@@ -15,6 +15,7 @@ from DRV8825 import SIMULATION_MODE
 from feeding_stats import PORTION_CUPS
 from servo_controller import PORTION_SIZES, DEFAULT_PORTION
 import dashboard
+import hopper
 
 APP_VERSION = "1.5.0"
 STATIC_DIR = Path(__file__).parent / 'static'
@@ -169,7 +170,7 @@ def _hopper_card(ctx):
     card.update({
         'level': h['level'],
         'pct': pct,
-        'low': h['level'] <= 0.15,
+        'low': h['level'] <= hopper.LOW_LEVEL,
         'headline': f"~{pct}% full",
         'lbs_label': f"· ~{h['lbs_left']:g} lb" if h['lbs_left'] is not None else None,
         'refill_by': f"Refill by {h['refill_by_label']}" if h.get('refill_by_label') else None,

@@ -23,7 +23,7 @@ HOPPER_FILE = 'hopper.json'
 ESTIMATES_KEPT = 5
 MIN_LEARN_CUPS = 2.0  # skip learning from refills after trivial consumption — tiny counters yield garbage capacity estimates
 LOW_DAYS = 2       # alert when predicted days of food left drops to this
-LOW_LEVEL = 0.15   # ...or when estimated fill level drops below this
+LOW_LEVEL = 0.25   # ...or when estimated fill level drops below this — not lower: portions shrink once the cone runs dry
 
 
 def _default_state():
