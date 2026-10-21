@@ -3,9 +3,9 @@
 # by the time this runs the commit is public, so a failure means reword the
 # branch (or squash it away) before it reaches main.
 #
-# Shapes are kept in step with message-scan.sh in Jason's dotfiles. The term
-# list comes from the PRIVATE_TERMS secret (one regex per line) and is never
-# printed. Secrets in messages are left to GitHub's push protection.
+# Shapes are kept in step with the local commit-msg hook. The term list comes
+# from the PRIVATE_TERMS secret (one regex per line) and is never printed.
+# Secrets in messages are left to GitHub's push protection.
 name: Commit message scan
 
 on:
@@ -61,6 +61,11 @@ jobs:
           [ ${#terms[@]} -eq 0 ] && echo "::warning::PRIVATE_TERMS secret not set; checking shapes only."
 
           fail=0
+          # A typo'd term must fail loudly, not silently stop matching.
+          for i in "${!terms[@]}"; do
+            grep -qiE -e "${terms[$i]}" <<< "" 2>/dev/null
+            [ $? -eq 2 ] && { echo "::error::PRIVATE_TERMS entry $((i + 1)) is not a valid regex"; fail=1; }
+          done
           for sha in $(git rev-list "${range[@]}"); do
             message=$(git log -1 --format=%B "$sha")
             for entry in "${patterns[@]}"; do
