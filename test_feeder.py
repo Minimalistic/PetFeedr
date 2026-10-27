@@ -934,6 +934,24 @@ class TestManualFeedGuards(TempCwd):
         resp = self.client.post('/add', data={'feeding_time': '23:59'}, headers=self.json)
         self.assertEqual(resp.status_code, 200)
 
+    def test_rebound_host_refused(self):
+        # DNS rebinding: the attacker's name, same-origin, still refused.
+        with patch('web_interface.feed_pet') as mock_feed:
+            resp = self.client.post('/feed', data={'portion': 'small'},
+                                    headers={**self.json, 'Host': 'evil.example:5000',
+                                             'Origin': 'http://evil.example:5000'})
+        self.assertEqual(resp.status_code, 421)
+        mock_feed.assert_not_called()
+        self.assertEqual(self.client.get('/api/state', headers={'Host': 'evil.example:5000'}).status_code, 421)
+
+    def test_own_hosts_allowed(self):
+        from web_interface import own_host
+        for host in ('localhost:5000', 'petfeedr:5000', 'petfeedr.local:5000',
+                     'petfeedr.taile3d5c.ts.net', '192.168.1.40:5000', '100.64.0.9:5000', '[::1]:5000'):
+            self.assertTrue(own_host(host), host)
+        for host in ('evil.example', 'petfeedr.evil.example', 'ts.net.evil.example', '[::1', ''):
+            self.assertFalse(own_host(host), host)
+
 
 class TestWatchdog(TempCwd):
     """ops/mini-sync/watchdog.py: outside-in alerts from the synced store."""

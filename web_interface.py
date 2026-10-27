@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import ipaddress
 import os
 import time
 from datetime import datetime
@@ -31,6 +32,35 @@ app.secret_key = os.environ.get('FLASK_SECRET_KEY', os.urandom(24).hex())
 # previous release after a deploy
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 app.register_blueprint(schedule_bp)
+
+
+# Names this box answers to. DNS rebinding points an attacker's own name at
+# the Pi, so its page counts as same-origin and the Origin check passes; the
+# Host header still carries the attacker's name, so refusing unknown names
+# stops it. IP literals can't be rebound, and only Tailscale serves *.ts.net.
+OWN_HOSTS = {'localhost', 'petfeedr', 'petfeedr.local'}
+
+
+def own_host(host):
+    try:
+        name = urlparse(f'//{host}').hostname or ''
+    except ValueError:      # a malformed Host such as '[::1'
+        return False
+    if name in OWN_HOSTS or name.endswith('.ts.net'):
+        return True
+    try:
+        ipaddress.ip_address(name)
+        return True
+    except ValueError:
+        return False
+
+
+@app.before_request
+def reject_unknown_hosts():
+    if not own_host(request.host):
+        log.warning(f"Rejected request for unknown host {request.host!r} {request.method} {request.path}")
+        return error_response('Unknown host', 421)
+    return None
 
 
 @app.before_request
