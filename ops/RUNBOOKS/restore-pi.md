@@ -22,7 +22,9 @@ Their config isn't backed up anywhere in this repo.
 
 ## Steps
 
-1. **Flash.** Raspberry Pi Imager → Raspberry Pi OS Lite. In OS customisation, set:
+1. **Flash.** The board is a Raspberry Pi 3 Model B (1 GB, rev `a22082`).
+   Raspberry Pi Imager → device Raspberry Pi 3 → Raspberry Pi OS Lite (32-bit),
+   matching the old card (trixie, `armv7l`). In OS customisation, set:
    hostname `petfeedr`, user `jason`, SSH public-key only (`~/.ssh/id_ed25519.pub`),
    Wi-Fi, and timezone `America/Chicago`.
 2. **Boot and clear old host keys** (on the mini):
@@ -40,6 +42,11 @@ Their config isn't backed up anywhere in this repo.
 4. **Build prerequisites.** RPi.GPIO compiles from source on current Python:
    ```bash
    ssh jason@petfeedr 'sudo apt update && sudo apt install -y python3-venv python3-dev gcc rsync'
+   ```
+   Then generate `en_US.UTF-8`. The mac's SSH forwards `LC_ALL=en_US.UTF-8`, the
+   Imager only builds `en_GB`, and without it every command prints a `setlocale` warning:
+   ```bash
+   ssh jason@petfeedr 'sudo sed -i "s/^# en_US.UTF-8 UTF-8$/en_US.UTF-8 UTF-8/" /etc/locale.gen && sudo locale-gen'
    ```
 5. **Deploy the code** from the repo on the mini:
    ```bash
