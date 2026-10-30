@@ -10,9 +10,9 @@ is irreplaceable: code is in git, and data plus config are on the mini.
 | `.env` (Pushover creds) | newest `~/PetFeedr-backups/*/.env` (every deploy snapshots it) |
 | Rotated logs | `~/.petfeedr-data/logs/` (history only; the Pi doesn't need them back) |
 
-**Not covered: Pi-hole and Samba also run on this Pi.** If the network's
-DNS points at it, name resolution for the house goes down with the card.
-Their config isn't backed up anywhere in this repo.
+Pi-hole and Samba used to run on this Pi too. Both were removed on
+2026-10-30, unused since August, so the card holds nothing else to restore.
+The Pi resolves names through Tailscale (1.1.1.1 and 8.8.8.8 upstream).
 
 ## Precondition
 
